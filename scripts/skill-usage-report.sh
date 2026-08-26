@@ -1,24 +1,79 @@
 #!/bin/sh
-# Produce a usage report from ${CLAUDE_PLUGIN_DATA}/skill-usage.jsonl.
-# Usage: skill-usage-report.sh [--since Nd]
-# Example: skill-usage-report.sh --since 7d
+# Produce a usage report from skill-usage.jsonl.
+# Usage: skill-usage-report.sh [--data-dir <path>] [--since Nd]
 
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
-data_dir="${CLAUDE_PLUGIN_DATA}"
-log_file="${data_dir}/skill-usage.jsonl"
 
-# --since Nd: filter to last N days. 0 = no filter.
+# ---------- argument parsing ----------
+data_dir_arg=""
 since_days=0
-if [ "$1" = "--since" ] && [ -n "$2" ]; then
-    since_days=$(printf '%s' "$2" | sed 's/[dD]$//')
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --data-dir)
+            data_dir_arg="$2"
+            shift 2
+            ;;
+        --since)
+            since_days=$(printf '%s' "$2" | sed 's/[dD]$//')
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+# ---------- locate log file(s) ----------
+# Resolution order:
+#   1. --data-dir <path> if non-empty and log exists there
+#   2. $CLAUDE_PLUGIN_DATA if non-empty and log exists there
+#   3. glob $HOME/.claude/plugins/data/handbook-*/skill-usage.jsonl
+
+log_files=""   # newline-separated list of found log files
+sources=""     # human-readable list of paths found
+
+try_dir() {
+    d="$1"
+    [ -n "$d" ] || return
+    f="${d}/skill-usage.jsonl"
+    if [ -f "$f" ]; then
+        log_files="${log_files}${f}
+"
+        sources="${sources}  ${f}
+"
+    fi
+}
+
+if [ -n "$data_dir_arg" ]; then
+    # Explicit --data-dir takes precedence; try it only (don't also glob).
+    try_dir "$data_dir_arg"
+else
+    # Try env var first.
+    try_dir "$CLAUDE_PLUGIN_DATA"
+    # Then glob for any handbook install path.
+    for f in "$HOME"/.claude/plugins/data/handbook-*/skill-usage.jsonl; do
+        [ -f "$f" ] || continue
+        # Avoid duplicating a path already found via env var.
+        case "
+${log_files}" in
+            *"
+${f}
+"*) ;;
+            *) log_files="${log_files}${f}
+"
+               sources="${sources}  ${f}
+" ;;
+        esac
+    done
 fi
 
 command -v jq >/dev/null 2>&1 || { printf 'error: jq is required\n'; exit 1; }
 
-# Discover skills from skills/ directory (strip trailing /SKILL.md, keep basename).
+# Discover skills from skills/ directory.
 skills_dir="${PLUGIN_ROOT}/skills"
 all_skills_file=$(mktemp)
-trap 'rm -f "$all_skills_file" "$tmpfile" "$fired_file"' EXIT
+trap 'rm -f "$all_skills_file" "$tmpfile" "$fired_file" "$merged_log"' EXIT
 
 if [ -d "$skills_dir" ]; then
     for d in "$skills_dir"/*/; do
@@ -30,9 +85,14 @@ sort -o "$all_skills_file" "$all_skills_file"
 
 printf '=== Handbook skill usage report ===\n'
 
-# If no log file, report that but still show never-fired list.
-if [ ! -f "$log_file" ]; then
-    printf 'Log file not found: %s\n' "$log_file"
+# If no log file found, report clearly and still show never-fired list.
+if [ -z "$log_files" ]; then
+    if [ -n "$data_dir_arg" ]; then
+        printf 'Log file not found in: %s\n' "$data_dir_arg"
+    else
+        printf 'Log file not found in any known install path.\n'
+        printf '(Checked: %s/.claude/plugins/data/handbook-*/skill-usage.jsonl)\n' "$HOME"
+    fi
     printf '\nNo invocations recorded yet.\n'
     if [ -s "$all_skills_file" ]; then
         printf '\n--- Never fired ---\n'
@@ -43,10 +103,17 @@ if [ ! -f "$log_file" ]; then
     exit 0
 fi
 
+printf 'Reading log(s):\n%s\n' "$sources"
+
+# Merge all found logs into one temp file (sorted by timestamp).
+merged_log=$(mktemp)
+printf '%s' "$log_files" | while IFS= read -r f; do
+    [ -n "$f" ] && [ -f "$f" ] && cat "$f"
+done | sort >> "$merged_log"
+
 # Compute cutoff timestamp for --since filter.
 cutoff=""
 if [ "$since_days" -gt 0 ] 2>/dev/null; then
-    # Try GNU date, then BSD date.
     if cutoff=$(date -d "-${since_days} days" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null); then
         :
     elif cutoff=$(date -v "-${since_days}d" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null); then
@@ -72,9 +139,9 @@ if [ -n "$cutoff" ]; then
             "") ;;
             *)  [ "$ts" \> "$cutoff" ] || [ "$ts" = "$cutoff" ] && printf '%s\n' "$line" ;;
         esac
-    done < "$log_file" > "$tmpfile"
+    done < "$merged_log" > "$tmpfile"
 else
-    cp "$log_file" "$tmpfile"
+    cp "$merged_log" "$tmpfile"
 fi
 
 total=$(wc -l < "$tmpfile" | tr -d ' ')
@@ -85,7 +152,6 @@ else
     printf '%-45s  %6s  %s\n' "Skill" "Count" "Last used"
     printf '%-45s  %6s  %s\n' "-----" "-----" "---------"
 
-    # Aggregate: count + last timestamp per skill.
     jq -r '.skill' "$tmpfile" 2>/dev/null | sort -u > "$fired_file"
 
     while IFS= read -r sk; do
@@ -98,10 +164,8 @@ fi
 
 printf '\n--- Never fired ---\n'
 
-# Compare all_skills_file against fired_file using comm (both sorted).
 jq -r '.skill' "$tmpfile" 2>/dev/null | sort -u > "$fired_file"
 
-# comm -23: lines only in all_skills (not in fired).
 never=$(comm -23 "$all_skills_file" "$fired_file" 2>/dev/null)
 if [ -z "$never" ]; then
     printf '  (all known skills have fired in this window)\n'

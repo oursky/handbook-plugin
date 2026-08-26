@@ -18,10 +18,12 @@ case "$skill" in
     *) exit 0 ;;
 esac
 
-# Resolve data dir; skip silently if unset or unmakeable.
+# Resolve data dir; fall back to the marketplace install path when the env var
+# is unset (e.g. slash-command context where substitution didn't resolve).
+# Always exits 0 — a logging failure must never break the user's session.
 data_dir="${CLAUDE_PLUGIN_DATA}"
 if [ -z "$data_dir" ]; then
-    exit 0
+    data_dir="${HOME}/.claude/plugins/data/handbook-oursky-handbook"
 fi
 mkdir -p "$data_dir" 2>/dev/null || exit 0
 

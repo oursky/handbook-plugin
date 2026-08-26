@@ -5,4 +5,4 @@ disable-model-invocation: true
 allowed-tools: Bash(sh:*)
 ---
 
-!`sh "${CLAUDE_PLUGIN_ROOT}/scripts/skill-usage-report.sh" $ARGUMENTS`
+!`sh "${CLAUDE_PLUGIN_ROOT}/scripts/skill-usage-report.sh" --data-dir "${CLAUDE_PLUGIN_DATA}" $ARGUMENTS`
