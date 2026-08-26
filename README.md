@@ -3,30 +3,7 @@
 Claude Code plugin exposing Oursky's private handbooks
 to Claude Code agents as a read-only reference.
 
-**Status: v0.2.0 — multi-handbook support; `dev-*` skill rename (breaking).**
-
----
-
-## BREAKING CHANGE from v0.1.0
-
-**The nine `handbook-dev` skills have been renamed with a `dev-` prefix.**
-The old un-prefixed directories (`agentic-engineering/`, `deployment-infra/`, etc.)
-no longer exist. There are no alias shims. If you have v0.1.0 installed, the
-old skill names will stop resolving after the upgrade.
-
-Old name → new name:
-
-| v0.1.0 | v0.2.0 |
-|--------|--------|
-| `handbook:agentic-engineering` | `handbook:dev-agentic-engineering` |
-| `handbook:deployment-infra` | `handbook:dev-deployment-infra` |
-| `handbook:development` | `handbook:dev-development` |
-| `handbook:git` | `handbook:dev-git` |
-| `handbook:human-interface` | `handbook:dev-human-interface` |
-| `handbook:observability` | `handbook:dev-observability` |
-| `handbook:project-setup` | `handbook:dev-project-setup` |
-| `handbook:security` | `handbook:dev-security` |
-| `handbook:web` | `handbook:dev-web` |
+**Status: v0.2.0 — multi-handbook support.**
 
 ---
 
@@ -235,6 +212,32 @@ The authoring skill accepts:
 ---
 
 
+## Manual sync (`/handbook:sync`)
+
+The SessionStart hook syncs each handbook once, when the session starts. A long
+session therefore drifts from the handbook's latest commit, and the hook's output
+goes into the SessionStart payload the model sees, not to you.
+
+`/handbook:sync` re-runs the sync on demand and prints what you actually have:
+
+```
+ID     LABEL                          SHA       DATE        STATUS
+dev    Oursky engineering handbook    431b1b0   2026-08-25  [CLONED]
+pm     Oursky PM workflow handbook    0591683   2026-08-13  already current
+```
+
+`STATUS` is the answer to "am I on latest": `[CLONED]` on first sync, `[UPDATED]`
+(with the previous SHA) when the handbook moved, `already current` when it did not.
+`DATE` is the commit date of the tip you are on.
+
+Pass `--regen` to also run the skill generator afterwards, so skills pick up new or
+removed handbook files. Regeneration never rewrites an existing `description:` line.
+
+The command is `disable-model-invocation: true` — it only runs when you type it.
+
+---
+
+
 ## Directory layout
 
 ```
@@ -244,8 +247,14 @@ handbook-plugin/
     marketplace.json   local marketplace declaration
   handbooks.json       declared handbooks (id, url, topic_root, depth, label)
   hooks/
-    hooks.json         SessionStart hook declaration
+    hooks.json         SessionStart + PostToolUse hook declarations
     sync-handbook.sh   clone/pull script; reads handbooks.json; requires jq
+    log-skill-usage.sh PostToolUse hook; appends to skill-usage.jsonl
+  commands/
+    sync.md            /handbook:sync command
+    usage.md           /handbook:usage command (skill usage report)
+  scripts/
+    skill-usage-report.sh  report generator called by /handbook:usage
   skills/
     dev-agentic-engineering/SKILL.md
     dev-deployment-infra/SKILL.md
