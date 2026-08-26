@@ -1,0 +1,18 @@
+{
+  "handbooks": [
+    {
+      "id": "dev",
+      "url": "git@github.com:oursky/handbook-dev.git",
+      "topic_root": "guides/",
+      "depth": 1,
+      "label": "Oursky engineering handbook"
+    },
+    {
+      "id": "pm",
+      "url": "git@github.com:oursky/os-project-management.git",
+      "topic_root": "usage-guide/",
+      "depth": 0,
+      "label": "Oursky PM workflow handbook"
+    }
+  ]
+}
