@@ -1,0 +1,14 @@
+node_modules/
+evals/results/
+.DS_Store
+
+# Groundwork runs (keep motives and journal)
+.groundwork/runs/
+
+# Editor / OS junk
+*.swp
+*.swo
+*~
+Thumbs.db
+.idea/
+.vscode/
