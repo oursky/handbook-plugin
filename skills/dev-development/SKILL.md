@@ -1,5 +1,5 @@
 ---
-name: development
+name: dev-development
 description: "Development guidance from Oursky's engineering handbook. Use when asking about API versioning, Golang SSRF, Python or React rules, WordPress setup, dogpile caching, or non-breaking changes."
 user-invocable: false
 ---
@@ -25,8 +25,8 @@ CACHE="${HANDBOOK_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/oursky-handbook}"
 ## How to answer
 
 1. Identify which file(s) cover the question.
-2. Read the relevant file(s) in **full** from `$CACHE/guides/development/`.
+2. Read the relevant file(s) in **full** from `$CACHE/dev/guides/development/`.
    Do not excerpt or paraphrase from memory — quote the file.
 3. For an exact-string lookup (e.g. a config value, command, or rule):
-   `rg -l "search term" "$CACHE/guides/development/"`
+   `rg -l "search term" "$CACHE/dev/guides/development/"`
 4. `historical-archive/` is deprecated; do not cite files from it.

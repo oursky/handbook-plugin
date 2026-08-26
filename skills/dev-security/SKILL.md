@@ -1,5 +1,5 @@
 ---
-name: security
+name: dev-security
 description: "Security guidance from Oursky's engineering handbook. Use when asking about secrets, GPG, SOPS, incident response, package audit, or how to keep a new project secure."
 user-invocable: false
 ---
@@ -19,8 +19,8 @@ CACHE="${HANDBOOK_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/oursky-handbook}"
 ## How to answer
 
 1. Identify which file(s) cover the question.
-2. Read the relevant file(s) in **full** from `$CACHE/guides/security/`.
+2. Read the relevant file(s) in **full** from `$CACHE/dev/guides/security/`.
    Do not paraphrase rules from memory — quote the file.
 3. For an exact-string lookup (e.g. a config value, command, or rule):
-   `rg -l "search term" "$CACHE/guides/security/"`
+   `rg -l "search term" "$CACHE/dev/guides/security/"`
 4. `historical-archive/` is deprecated; do not cite files from it.

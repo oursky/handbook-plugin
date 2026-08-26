@@ -1,5 +1,5 @@
 ---
-name: deployment-infra
+name: dev-deployment-infra
 description: "Deployment & infra guidance from Oursky's engineering handbook. Use when asking how to deploy to Kubernetes, host a static site with pageship, set up a reverse proxy, or provision GCP block storage."
 user-invocable: false
 ---
@@ -23,8 +23,8 @@ CACHE="${HANDBOOK_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/oursky-handbook}"
 ## How to answer
 
 1. Identify which file(s) cover the question.
-2. Read the relevant file(s) in **full** from `$CACHE/guides/deployment-infra/`.
+2. Read the relevant file(s) in **full** from `$CACHE/dev/guides/deployment-infra/`.
    Do not paraphrase rules from memory — quote the file.
 3. For an exact-string lookup (e.g. a config value, command, or rule):
-   `rg -l "search term" "$CACHE/guides/deployment-infra/"`
+   `rg -l "search term" "$CACHE/dev/guides/deployment-infra/"`
 4. `historical-archive/` is deprecated; do not cite files from it.

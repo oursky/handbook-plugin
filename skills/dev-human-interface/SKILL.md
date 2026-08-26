@@ -1,5 +1,5 @@
 ---
-name: human-interface
+name: dev-human-interface
 description: "Human interface guidance from Oursky's engineering handbook. Use when asking about frontend styling, design engineering, UI checklist, button padding, type scale, or responsive layout."
 user-invocable: false
 ---
@@ -17,8 +17,8 @@ CACHE="${HANDBOOK_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/oursky-handbook}"
 ## How to answer
 
 1. Identify which file(s) cover the question.
-2. Read the relevant file(s) in **full** from `$CACHE/guides/human-interface/`.
+2. Read the relevant file(s) in **full** from `$CACHE/dev/guides/human-interface/`.
    Do not paraphrase rules from memory — quote the file.
 3. For an exact-string lookup (e.g. a config value, command, or rule):
-   `rg -l "search term" "$CACHE/guides/human-interface/"`
+   `rg -l "search term" "$CACHE/dev/guides/human-interface/"`
 4. `historical-archive/` is deprecated; do not cite files from it.
