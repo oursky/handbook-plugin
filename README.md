@@ -3,7 +3,7 @@
 Claude Code plugin exposing Oursky's private handbooks
 to Claude Code agents as a read-only reference.
 
-**Status: v0.2.0 — multi-handbook support.**
+**Status: v0.3.0 — multi-handbook support; manual sync and usage reporting.**
 
 ---
 
