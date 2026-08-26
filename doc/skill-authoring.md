@@ -35,8 +35,6 @@ user-invocable: false
 ```
 
 **Key spelling:** `user-invocable` (hyphen, not underscore).
-Citation: `doc/eval-probe-findings.md` §Q-A — "qa-hidden (user-invocable: false)" was
-confirmed functional via live eval; the binary key is hyphenated kebab-case.
 
 ### Description rules
 
@@ -154,43 +152,3 @@ Concrete examples:
 
 ---
 
-## Eval file format
-
-Path: `evals/<handbook-id>-<topic>.json`
-
-```json
-{
-  "skill": "handbook:<handbook-id>-<topic>",
-  "grader": {
-    "type": "tool_used",
-    "tool": "Skill",
-    "skill": "handbook:<handbook-id>-<topic>"
-  },
-  "note": "Labels are TBD. A human must set must-fire/may-fire/must-not-fire before running CI.",
-  "prompts": [
-    {
-      "id": "<handbook-id>-<topic>-001",
-      "prompt": "<natural question — NOT a section title echo>",
-      "label": "TBD",
-      "human_labelled": false
-    }
-  ]
-}
-```
-
-Rules:
-- ≥5 prompts per topic.
-- Prompts must sound like a developer or PM asking in Slack, not like a handbook
-  section title.
-- `label` is always `"TBD"`; `human_labelled` is always `false`.
-  A human reviewer will later mark each prompt must-fire / may-fire / must-not-fire.
-  Exception: `evals/negatives.json` is exempt — clear out-of-scope prompts carry
-  `label: must-not-fire`; only borderline negatives are TBD.
-- LLMs must NOT author the expected answers — that is the human's job.
-- Grader: `tool_used: Skill` for `handbook:<handbook-id>-<topic>`.
-
----
-
-## Running evals
-
-See `evals/README.md`.

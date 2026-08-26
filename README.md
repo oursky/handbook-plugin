@@ -234,14 +234,6 @@ The authoring skill accepts:
 
 ---
 
-## Evals (descoped — frozen baseline only)
-
-The `evals/` directory contains the v0.1.0 baseline eval suite (86 cases, one
-JSON file per topic). It is kept as a historical artifact and reference; it is
-**not a live workflow**. Decision D-8 descoped eval labelling and re-runs from
-this project. Do not run the suite in CI or treat its results as current.
-
----
 
 ## Directory layout
 
@@ -266,20 +258,10 @@ handbook-plugin/
     dev-web/SKILL.md
     pm-usage-guide/SKILL.md
     handbook-authoring/SKILL.md   (user-invocable: true; generates the above)
-  evals/
-    README.md               eval format and grader limitations (frozen)
-    RESULTS.md              v0.1.0 baseline run results (frozen)
-    run.sh                  converter + runner (frozen; not a live workflow)
-    *.json                  86 eval cases across 10 topic files (frozen)
   doc/
     skill-authoring.md      authoring contract; one trigger-noun table per handbook
-    plugin-reload-findings.md  empirical reload findings (both install paths)
-    eval-probe-findings.md  empirical findings on eval mechanics
-    OPEN-QUESTIONS.md       pre-implementation questions + resolutions
     research-brief.html     background research on plugin architecture
 ```
-
----
 
 ## Contributing
 
