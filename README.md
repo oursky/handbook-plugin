@@ -1,355 +1,131 @@
 # handbook-plugin
 
-Claude Code plugin exposing Oursky's private handbooks
-to Claude Code agents as a read-only reference.
+Claude Code plugin exposing Oursky's private handbooks to agents as read-only reference.
 
-**Status: v0.3.0 — multi-handbook support; manual sync and usage reporting.**
-
----
+**v0.3.0** — multi-handbook support, manual sync, usage reporting.
 
 ## Install
 
-SSH access to `oursky/handbook-dev` and `oursky/os-project-management` is required
-(the sync hook clones via SSH at session start).
-
-**Dependency: `jq`** — the sync hook and the authoring skill both require `jq` to parse
-`handbooks.json`. If `jq` is absent, the hook warns and exits without syncing anything.
-Install with `brew install jq` (macOS) or `apt install jq` (Debian/Ubuntu).
-
-### Quick / per-session (no config changes)
-
-Pass `--plugin-dir` to `claude` for a single session:
-
 ```bash
-claude --plugin-dir <path-to-plugin-repo>
-```
-
-> `--plugin-dir` verified in `claude --help` (CLI 2.1.245): "Load a plugin from a directory or .zip for this session only (repeatable)".
-
-### Persistent (installs to user config)
-
-Register the repo as a local marketplace, then install the plugin:
-
-```bash
-claude plugin marketplace add <path-to-plugin-repo>
+claude plugin marketplace add oursky/handbook-plugin
 claude plugin install handbook
 ```
 
-This works because `.claude-plugin/marketplace.json` declares the `handbook` plugin with `source: "./"`.
-Scope defaults to `user`; pass `--scope project` to restrict to one repo.
+Restart Claude Code, then ask something like "what's our branch naming convention?"
+to confirm it routes to the handbook.
 
-### Environment variables
+This repo is public, but the handbooks it syncs are not — you need `jq`
+(`brew install jq` / `apt install jq`) and SSH access to `oursky/handbook-dev` and
+`oursky/os-project-management`. They sync to `~/.cache/oursky-handbook/` at session start.
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `HANDBOOK_CACHE_DIR` | `${XDG_CACHE_HOME:-$HOME/.cache}/oursky-handbook` | Cache root; each handbook syncs into `<cache-root>/<id>/` |
+To update:
 
-`HANDBOOK_REPO_URL` from v0.1.0 is retired — use `handbooks.json` to declare repos.
+```bash
+claude plugin marketplace update oursky-handbook
+claude plugin update handbook
+```
 
----
+## Commands
 
-## Handbooks declared (`handbooks.json`)
+| Command | Purpose |
+|---|---|
+| `/handbook:sync` | Re-sync handbooks now; prints each one's SHA, commit date, and whether it moved. Add `--regen` to regenerate skills too. |
+| `/handbook:usage` | Which handbook skills have fired, how often, and which never have. Add `--since 7d` to window it. |
+
+Both are type-only (`disable-model-invocation: true`).
+
+## How it works
+
+1. **SessionStart hook** — `hooks/sync-handbook.sh` reads `handbooks.json` and
+   clones or fast-forward pulls each handbook into `$HANDBOOK_CACHE_DIR/<id>/`
+   (default `~/.cache/oursky-handbook`). Never exits non-zero; a failed handbook
+   keeps its stale cache while others sync.
+2. **Topic-scoped skills** — 11 skills, one per handbook section. The model picks
+   one from the prompt, reads the relevant file **in full** from the cache, and
+   shells out to `rg` for exact-string lookups.
+
+No index, no embeddings, no chunking, no PreToolUse injection — the corpus is
+small enough that whole-file reads are cheaper than a retrieval pipeline
+(decisions D-2, D-6).
+
+Skills: `dev-agentic-engineering`, `dev-deployment-infra`, `dev-development`,
+`dev-git`, `dev-human-interface`, `dev-observability`, `dev-project-setup`,
+`dev-security`, `dev-web`, `pm-usage-guide`, `handbook-authoring`.
+
+## Adding a handbook
+
+Add one entry to `handbooks.json` — no script edits needed:
 
 ```json
 {
-  "handbooks": [
-    {
-      "id": "dev",
-      "url": "git@github.com:oursky/handbook-dev.git",
-      "topic_root": "guides/",
-      "depth": 1,
-      "label": "Oursky engineering handbook"
-    },
-    {
-      "id": "pm",
-      "url": "git@github.com:oursky/os-project-management.git",
-      "topic_root": "usage-guide/",
-      "depth": 0,
-      "label": "Oursky PM workflow handbook"
-    }
-  ]
+  "id": "pm",
+  "url": "git@github.com:oursky/os-project-management.git",
+  "topic_root": "usage-guide/",
+  "depth": 0,
+  "label": "Oursky PM workflow handbook"
 }
 ```
 
-Field meanings:
-
 | Field | Purpose |
 |---|---|
-| `id` | Unique identifier; used as the skill-name prefix (`dev-git`, `pm-usage-guide`) and as the cache subdirectory name |
-| `url` | SSH clone URL for the handbook repo |
-| `topic_root` | Path within the repo that contains topic directories |
-| `depth` | Directory depth under `topic_root` at which topics live (`0` = topic_root is itself the single topic, `1` = immediate subdirs) |
-| `label` | Human-readable corpus name; feeds clause 1 of every generated skill description (e.g. "… from Oursky engineering handbook") so cross-handbook disambiguation works from the description alone |
+| `id` | Skill-name prefix (`dev-git`) and cache subdirectory |
+| `url` | SSH clone URL |
+| `topic_root` | Path within the repo containing topic directories |
+| `depth` | `0` = `topic_root` is itself one topic; `1` = its immediate subdirs are topics |
+| `label` | Corpus name used in clause 1 of each skill description, so two handbooks can share trigger nouns |
 
-To add a third handbook, add one entry to this file. No shell script edits are required.
+Then invoke the `handbook-authoring` skill to generate `skills/<id>-<topic>/SKILL.md`,
+review the diff, and commit. It never overwrites an existing `description:` line, so
+hand-tuned descriptions survive regeneration. Flags: `--threshold N` (skip topics with
+fewer than N files, default 3), `--check` (report duplicate trigger nouns, write nothing).
 
----
+## Developing this plugin
 
-## Cache layout
+Install from a local clone instead, so the plugin runs from your working tree and
+edits take effect on `/reload-plugins` with no version bump and no push:
 
-Each declared handbook is synced into its own subdirectory:
-
-```
-${HANDBOOK_CACHE_DIR}/
-  dev/          ← oursky/handbook-dev checkout
-    guides/
-      git/
-        git-workflow.md
-      ...
-  pm/           ← oursky/os-project-management checkout
-    usage-guide/
-      ...
+```bash
+git clone git@github.com:oursky/handbook-plugin.git ~/.local/share/handbook-plugin
+claude plugin marketplace add ~/.local/share/handbook-plugin
+claude plugin install handbook
 ```
 
-A v0.1.0 installation left the `handbook-dev` checkout flat at the cache root
-(`.git` directly under `oursky-handbook/`). The sync hook detects this, prints one
-warning naming the stale path, and clones into `<root>/dev/` regardless. It never
-deletes the old checkout.
+(`claude --plugin-dir <path>` does the same for a single session.)
 
----
+Installing from `oursky/handbook-plugin` instead gives you a clone that Claude Code
+owns, so changes need a `version` bump in **both** `.claude-plugin/plugin.json` and
+`.claude-plugin/marketplace.json`, a push, then `claude plugin update handbook`.
 
-## Architecture
+## Usage logging
 
-Four layers, no index, no embeddings, no PreToolUse injection.
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ 1. SessionStart sync                                        │
-│    hooks/sync-handbook.sh reads handbooks.json (requires    │
-│    jq) and clones or fast-forward pulls each handbook into  │
-│    <HANDBOOK_CACHE_DIR>/<id>/. Partial failure warns and    │
-│    keeps that handbook's stale cache; others still sync.    │
-│    Never exits non-zero.                                    │
-├─────────────────────────────────────────────────────────────┤
-│ 2. Topic-scoped skills (11 total, user-invocable: false     │
-│    except handbook-authoring)                               │
-│    Each skill covers one handbook section or corpus.        │
-│    The model routes to the right skill from natural prompts.│
-│                                                             │
-│    dev-agentic-engineering  MCP, codebox, agentic provision │
-│    dev-deployment-infra     Kubernetes, pageship, GCP       │
-│    dev-development          API versioning, Golang, React   │
-│    dev-git                  rebase, hotfix, branch naming   │
-│    dev-human-interface      frontend styling, UI checklist  │
-│    dev-observability        logging, OpenTelemetry, k6      │
-│    dev-project-setup        CI/CD, GitHub Actions, Make     │
-│    dev-security             secrets, GPG, SOPS, audits      │
-│    dev-web                  SEO, URL design, localization   │
-│    pm-usage-guide           PM workflow tools and skills    │
-│    handbook-authoring       generates per-topic skills      │
-├─────────────────────────────────────────────────────────────┤
-│ 3. Slim TOC + whole-file reads                              │
-│    Each skill body identifies the relevant file(s) and      │
-│    reads them in full from the cache — no chunking.         │
-├─────────────────────────────────────────────────────────────┤
-│ 4. ripgrep for exact lookups                                │
-│    Skills shell out to rg for precise term lookups          │
-│    (config values, commands, rule text) within the          │
-│    cached handbook tree.                                    │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**No PreToolUse injection** (decision D-6): the handbook is a hand-maintained
-knowledge base, not a policy engine; no must-not-miss constraints were
-identified that warrant intercepting every tool call.
-
-**No index or embeddings** (decision D-2): the handbook is small enough that
-whole-file reads are cheap; an embedding pipeline would add operational overhead
-with no retrieval-quality gain at this corpus size.
-
----
-
-## Adding or regenerating skills (`handbook-authoring`)
-
-Skills are generated at authoring time, not at runtime. The `handbook-authoring`
-skill (`user-invocable: true`) reads `handbooks.json` and the synced caches and
-writes `skills/<id>-<topic>/SKILL.md` files into this repo.
-
-### Workflow
-
-```
-1. Invoke the handbook-authoring skill in Claude Code
-   (it reads handbooks.json + cache; writes skills/<id>-<topic>/SKILL.md)
-
-2. Review the diff
-   Check generated descriptions; the skill never overwrites an existing
-   description: line, so a human-reviewed description is never silently lost.
-   Edit any description you want to tune before committing.
-
-3. Commit and reload
-   See reload instructions below.
-```
-
-### Reload after adding or regenerating skills
-
-The correct reload steps depend on how the plugin is loaded.
-
-**If using `--plugin-dir`** — no version bump needed:
-
-```
-Start a new Claude Code session with --plugin-dir <path>.
-Or run /reload-plugins within your current session.
-```
-
-**If installed via marketplace** (`claude plugin install handbook`) — version bump required
-because marketplace-installed plugins load from a frozen per-version cache:
-
-```
-1. Bump "version" in .claude-plugin/plugin.json
-2. Bump "version" in .claude-plugin/marketplace.json  (must match)
-3. Commit and push
-4. Run: claude plugin update handbook
-5. Start a new session (or /reload-plugins in the current one)
-```
-
-### `--threshold` and `--check` flags
-
-The authoring skill accepts:
-
-- `--threshold N` (default 3): topics with fewer than N `.md` files are skipped and reported rather than generating a skill.
-- `--check`: report within-handbook duplicate trigger nouns and cross-handbook near-duplicates without writing any files.
-
----
-
-
-## Manual sync (`/handbook:sync`)
-
-The SessionStart hook syncs each handbook once, when the session starts. A long
-session therefore drifts from the handbook's latest commit, and the hook's output
-goes into the SessionStart payload the model sees, not to you.
-
-`/handbook:sync` re-runs the sync on demand and prints what you actually have:
-
-```
-ID     LABEL                          SHA       DATE        STATUS
-dev    Oursky engineering handbook    431b1b0   2026-08-25  [CLONED]
-pm     Oursky PM workflow handbook    0591683   2026-08-13  already current
-```
-
-`STATUS` is the answer to "am I on latest": `[CLONED]` on first sync, `[UPDATED]`
-(with the previous SHA) when the handbook moved, `already current` when it did not.
-`DATE` is the commit date of the tip you are on.
-
-Pass `--regen` to also run the skill generator afterwards, so skills pick up new or
-removed handbook files. Regeneration never rewrites an existing `description:` line.
-
-The command is `disable-model-invocation: true` — it only runs when you type it.
-
-
-## Skill usage logging (`/handbook:usage`)
-
-A `PostToolUse` hook fires each time any skill is invoked. The hook filters to
-`handbook:` namespaced skills only and appends one line to a local JSONL log.
-
-### What is logged
-
-Each line contains exactly:
+A `PostToolUse` hook appends one line per `handbook:`-namespaced skill invocation to
+`~/.claude/plugins/data/handbook-*/skill-usage.jsonl`:
 
 ```json
 {"timestamp":"2026-08-25T17:00:00Z","skill":"handbook:dev-git","session_id":"…","success":true}
 ```
 
-- `timestamp` — ISO 8601 UTC
-- `skill` — namespaced skill name (e.g. `handbook:dev-git`)
-- `session_id` — opaque session identifier from the hook payload
-- `success` — whether the skill invocation succeeded (bool or null)
+**Never logged:** prompt text, cwd, transcript path. Local only, no network calls.
+Disable by removing the `PostToolUse` entry from `hooks/hooks.json`; clear by deleting
+the JSONL file.
 
-**Never logged:** prompt text, transcript path, cwd, or any other user activity.
-This is local telemetry about which skills fire, not a record of what you were doing.
+**It has no denominator.** A question where a handbook skill *should* have fired but
+didn't leaves no trace. This is a usage distribution, not a trigger rate — the
+actionable signal is a skill sitting at zero after real work, meaning its description
+doesn't match how people phrase those questions.
 
-### Where the file lives
-
-The log is written to whichever install path is active:
-
-- **Marketplace install:** `~/.claude/plugins/data/handbook-oursky-handbook/skill-usage.jsonl`
-- **`--plugin-dir` (dev/inline) install:** `~/.claude/plugins/data/handbook-inline/skill-usage.jsonl`
-
-The hook resolves the path from `$CLAUDE_PLUGIN_DATA` (set by Claude Code in
-hook processes). If that variable is unset, it falls back to the marketplace
-path above so entries are never silently dropped.
-
-`/handbook:usage` reads from whichever path(s) exist, merging them when both
-are present (e.g. after switching between install methods). It prints the
-path(s) it reads so a "no data" result is diagnosable.
-
-This file is **local only** — it never leaves the machine. No network calls are
-made by the hook.
-
-### Reading the report
-
-Run `/handbook:usage` in Claude Code. It prints per-skill invocation counts,
-last-used dates, and a list of skills that have never fired at all.
-
-Optionally pass `--since Nd` to limit the window (e.g. `/handbook:usage --since 7d`).
-
-### Limitation: no denominator
-
-This measures which skills *did* fire. It cannot see the misses — a question
-where a handbook skill should have fired and didn't leaves no trace. The report
-shows a usage distribution, not a true trigger rate. The actionable signal is a
-skill that never fires over real work, suggesting its trigger description doesn't
-match how users phrase those questions.
-
-### Disabling the hook
-
-Remove the `PostToolUse` entry from `hooks/hooks.json`. The `SessionStart` sync
-hook is unaffected.
-
-### Clearing the log
-
-```bash
-rm ~/.claude/plugins/data/handbook-oursky-handbook/skill-usage.jsonl   # marketplace install
-rm ~/.claude/plugins/data/handbook-inline/skill-usage.jsonl             # --plugin-dir install
-```
-
----
-
-
-
-## Directory layout
+## Layout
 
 ```
-handbook-plugin/
-  .claude-plugin/
-    plugin.json        plugin manifest (name, version, skills, hooks)
-    marketplace.json   local marketplace declaration
-  handbooks.json       declared handbooks (id, url, topic_root, depth, label)
-  hooks/
-    hooks.json         SessionStart + PostToolUse hook declarations
-    sync-handbook.sh   clone/pull script; reads handbooks.json; requires jq
-    log-skill-usage.sh PostToolUse hook; appends to skill-usage.jsonl
-  commands/
-    sync.md            /handbook:sync command
-    usage.md           /handbook:usage command (skill usage report)
-  scripts/
-    skill-usage-report.sh  report generator called by /handbook:usage
-  skills/
-    dev-agentic-engineering/SKILL.md
-    dev-deployment-infra/SKILL.md
-    dev-development/SKILL.md
-    dev-git/SKILL.md
-    dev-human-interface/SKILL.md
-    dev-observability/SKILL.md
-    dev-project-setup/SKILL.md
-    dev-security/SKILL.md
-    dev-web/SKILL.md
-    pm-usage-guide/SKILL.md
-    handbook-authoring/SKILL.md   (user-invocable: true; generates the above)
-  doc/
-    skill-authoring.md      authoring contract; one trigger-noun table per handbook
-    research-brief.html     background research on plugin architecture
+.claude-plugin/     plugin.json, marketplace.json
+handbooks.json      declared handbooks
+hooks/              sync-handbook.sh (SessionStart), log-skill-usage.sh (PostToolUse)
+commands/           sync.md, usage.md
+scripts/            handbook-sync-status.sh, skill-usage-report.sh
+skills/             11 SKILL.md files
+doc/                skill-authoring.md — binding authoring contract
 ```
 
-## Contributing
-
-**Adding a handbook:** add one entry to `handbooks.json`, run the sync hook,
-then invoke the `handbook-authoring` skill to generate topic skills.
-
-**Adding a skill:** invoke `handbook-authoring` against the synced cache, review
-the generated `skills/<id>-<topic>/SKILL.md`, and follow the reload workflow above.
-
-**Authoring contract:** see `doc/skill-authoring.md` — it is the binding contract
-for frontmatter, description rules, body template, and trigger-noun tables.
-Each handbook has its own reserved-trigger-noun table; nouns must be disjoint within
-a handbook. Cross-handbook overlap is resolved by naming the corpus in clause 1 of
-the skill description (the `label` field supplies this phrase).
+`doc/skill-authoring.md` is the contract for frontmatter, description rules, and the
+per-handbook trigger-noun tables. Trigger nouns must be disjoint within a handbook;
+across handbooks, the `label` in clause 1 disambiguates.
