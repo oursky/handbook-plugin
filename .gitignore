@@ -1,9 +1,17 @@
 node_modules/
-evals/results/
 .DS_Store
 
-# Groundwork runs (keep motives and journal)
-.groundwork/runs/
+# Groundwork working state (keep motives and journal)
+.groundwork/
+
+# Eval suite and results
+evals/
+
+# Internal documentation (not shipped)
+doc/OPEN-QUESTIONS.md
+doc/VERIFICATION.md
+doc/eval-probe-findings.md
+doc/plugin-reload-findings.md
 
 # Editor / OS junk
 *.swp
