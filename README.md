@@ -235,7 +235,67 @@ removed handbook files. Regeneration never rewrites an existing `description:` l
 
 The command is `disable-model-invocation: true` — it only runs when you type it.
 
+
+## Skill usage logging (`/handbook:usage`)
+
+A `PostToolUse` hook fires each time any skill is invoked. The hook filters to
+`handbook:` namespaced skills only and appends one line to a local JSONL log.
+
+### What is logged
+
+Each line contains exactly:
+
+```json
+{"timestamp":"2026-08-25T17:00:00Z","skill":"handbook:dev-git","session_id":"…","success":true}
+```
+
+- `timestamp` — ISO 8601 UTC
+- `skill` — namespaced skill name (e.g. `handbook:dev-git`)
+- `session_id` — opaque session identifier from the hook payload
+- `success` — whether the skill invocation succeeded (bool or null)
+
+**Never logged:** prompt text, transcript path, cwd, or any other user activity.
+This is local telemetry about which skills fire, not a record of what you were doing.
+
+### Where the file lives
+
+`${CLAUDE_PLUGIN_DATA}/skill-usage.jsonl`
+
+`CLAUDE_PLUGIN_DATA` is set by Claude Code and typically resolves to
+`~/.claude/plugins/data/<plugin-name>-inline/` (the `-inline` suffix marks
+session-loaded plugins; marketplace-installed paths may differ).
+
+This file is **local only** — it never leaves the machine. No network calls are
+made by the hook.
+
+### Reading the report
+
+Run `/handbook:usage` in Claude Code. It prints per-skill invocation counts,
+last-used dates, and a list of skills that have never fired at all.
+
+Optionally pass `--since Nd` to limit the window (e.g. `/handbook:usage --since 7d`).
+
+### Limitation: no denominator
+
+This measures which skills *did* fire. It cannot see the misses — a question
+where a handbook skill should have fired and didn't leaves no trace. The report
+shows a usage distribution, not a true trigger rate. The actionable signal is a
+skill that never fires over real work, suggesting its trigger description doesn't
+match how users phrase those questions.
+
+### Disabling the hook
+
+Remove the `PostToolUse` entry from `hooks/hooks.json`. The `SessionStart` sync
+hook is unaffected.
+
+### Clearing the log
+
+```bash
+rm "${CLAUDE_PLUGIN_DATA}/skill-usage.jsonl"
+```
+
 ---
+
 
 
 ## Directory layout
