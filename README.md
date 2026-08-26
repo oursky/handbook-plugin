@@ -259,11 +259,18 @@ This is local telemetry about which skills fire, not a record of what you were d
 
 ### Where the file lives
 
-`${CLAUDE_PLUGIN_DATA}/skill-usage.jsonl`
+The log is written to whichever install path is active:
 
-`CLAUDE_PLUGIN_DATA` is set by Claude Code and typically resolves to
-`~/.claude/plugins/data/<plugin-name>-inline/` (the `-inline` suffix marks
-session-loaded plugins; marketplace-installed paths may differ).
+- **Marketplace install:** `~/.claude/plugins/data/handbook-oursky-handbook/skill-usage.jsonl`
+- **`--plugin-dir` (dev/inline) install:** `~/.claude/plugins/data/handbook-inline/skill-usage.jsonl`
+
+The hook resolves the path from `$CLAUDE_PLUGIN_DATA` (set by Claude Code in
+hook processes). If that variable is unset, it falls back to the marketplace
+path above so entries are never silently dropped.
+
+`/handbook:usage` reads from whichever path(s) exist, merging them when both
+are present (e.g. after switching between install methods). It prints the
+path(s) it reads so a "no data" result is diagnosable.
 
 This file is **local only** — it never leaves the machine. No network calls are
 made by the hook.
@@ -291,7 +298,8 @@ hook is unaffected.
 ### Clearing the log
 
 ```bash
-rm "${CLAUDE_PLUGIN_DATA}/skill-usage.jsonl"
+rm ~/.claude/plugins/data/handbook-oursky-handbook/skill-usage.jsonl   # marketplace install
+rm ~/.claude/plugins/data/handbook-inline/skill-usage.jsonl             # --plugin-dir install
 ```
 
 ---
