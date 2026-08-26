@@ -3,6 +3,5 @@
   "name": "handbook",
   "version": "0.2.0",
   "description": "Oursky engineering and PM workflow handbooks as read-only reference for Claude Code agents",
-  "skills": "./skills",
-  "hooks": "./hooks/hooks.json"
+  "skills": "./skills"
 }
