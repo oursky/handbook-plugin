@@ -1,0 +1,8 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "handbook",
+  "version": "0.1.0",
+  "description": "Oursky engineering handbook as read-only reference for Claude Code agents",
+  "skills": "./skills",
+  "hooks": "./hooks/hooks.json"
+}

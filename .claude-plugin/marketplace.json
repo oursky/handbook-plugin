@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "oursky-handbook",
+  "owner": {
+    "name": "Oursky",
+    "url": "https://github.com/oursky"
+  },
+  "plugins": [
+    {
+      "name": "handbook",
+      "source": "./",
+      "displayName": "Oursky Handbook",
+      "description": "Oursky engineering handbook as read-only reference for Claude Code agents",
+      "version": "0.1.0"
+    }
+  ]
+}
