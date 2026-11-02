@@ -97,18 +97,17 @@ if [ -d "${CACHE_ROOT}/.git" ]; then
         "$CACHE_ROOT" >&2
 fi
 
-# Accumulate per-handbook status lines in a temp file so we can build the
-# additionalContext string after the pipe subshell finishes.
+# Each handbook syncs in its own background subshell and writes to its own
+# fragment file, so the hook waits for the slowest repo, not the sum.
 STATUS_FILE="$(mktemp)"
 RELOAD_FILE="$(mktemp)"
-trap 'rm -f "$STATUS_FILE" "$RELOAD_FILE"' EXIT
+LIST_FILE="$(mktemp)"
+trap 'rm -f "$STATUS_FILE" "$STATUS_FILE".* "$RELOAD_FILE" "$LIST_FILE"' EXIT
 
-# AC-2: iterate over every declared handbook.
-# One failing handbook warns, keeps its stale cache, and does not abort the loop.
-# team_skills is last and "-" when absent: tab is whitespace to read, so an
-# empty middle field would collapse.
-jq -r '.handbooks[] | "\(.id)\t\(.url)\t\(.label)\t\(.team_skills // "-")"' "$HANDBOOKS_JSON" | \
-while IFS="$(printf '\t')" read -r id url label team_skills; do
+# sync_one <id> <url> <label> <team_skills> <out-file>
+# One failing handbook warns and keeps its stale cache; the others carry on.
+sync_one() {
+    id="$1" url="$2" label="$3" team_skills="$4" out="$5"
     TARGET="${CACHE_ROOT}/${id}"
 
     if [ ! -d "${TARGET}/.git" ]; then
@@ -148,13 +147,30 @@ while IFS="$(printf '\t')" read -r id url label team_skills; do
         fi
     fi
 
-    printf '%s (%s) at %s [%s]\n' "$label" "$id" "$TARGET" "$sha" >> "$STATUS_FILE"
+    printf '%s (%s) at %s [%s]\n' "$label" "$id" "$TARGET" "$sha" >> "$out"
 
     if [ "$team_skills" != "-" ] && [ "$sha" != "no-cache" ]; then
         frag=$(install_team_skills "$TARGET" "$team_skills")
-        printf '%s\n' "$frag" >> "$STATUS_FILE"
+        printf '%s\n' "$frag" >> "$out"
         case "$frag" in *WARNING*) printf 'handbook[%s]: %s\n' "$id" "$frag" >&2 ;; esac
     fi
+}
+
+# team_skills is last and "-" when absent: tab is whitespace to read, so an
+# empty middle field would collapse.
+jq -r '.handbooks[] | "\(.id)\t\(.url)\t\(.label)\t\(.team_skills // "-")"' "$HANDBOOKS_JSON" > "$LIST_FILE"
+count=0
+while IFS="$(printf '\t')" read -r id url label team_skills; do
+    count=$((count + 1))
+    ( sync_one "$id" "$url" "$label" "$team_skills" "$STATUS_FILE.$count" ) &
+done < "$LIST_FILE"
+wait
+
+# Join the fragments in handbooks.json order.
+i=1
+while [ "$i" -le "$count" ]; do
+    [ -f "$STATUS_FILE.$i" ] && cat "$STATUS_FILE.$i" >> "$STATUS_FILE"
+    i=$((i + 1))
 done
 
 # Build the additionalContext string from accumulated status lines.
