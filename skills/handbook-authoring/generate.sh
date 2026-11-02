@@ -82,7 +82,7 @@ run_check() {
             hb_topics+=("$topic")
             hb_descs+=("$desc")
         done
-    done < <(jq -r '.handbooks[].id' "$HANDBOOKS_JSON")
+    done < <(jq -r '.handbooks[] | select(.topic_root) | .id' "$HANDBOOKS_JSON")
 
     # Within-handbook: duplicate nouns between skills of the same handbook
     echo "--- Within-handbook duplicates ---"
@@ -319,7 +319,7 @@ run_generate() {
         done
 
         echo ""
-    done < <(jq -c '.handbooks[]' "$HANDBOOKS_JSON")
+    done < <(jq -c '.handbooks[] | select(.topic_root)' "$HANDBOOKS_JSON")
 
     echo "Generated: $generated skill(s). Skipped: $skipped topic(s) below threshold ($MIN_FILES files)."
     echo ""

@@ -201,6 +201,121 @@ else
     fail "case i: warn_count=$WARN_COUNT (want 1), git=$(ls -d "${CACHE_I}/.git" 2>/dev/null || echo missing), readme=$(ls "${CACHE_I}/README.md" 2>/dev/null || echo missing), warn='$WARN_I'"
 fi
 
+# ── Team-skills cases (j–n) ──────────────────────────────────────────────────
+# Fixture mirrors oursky/handbook: team-skills/install.sh plus team folders, and
+# archive/ + files/ trees that the sparse clone must leave out. file:// is used
+# so --depth/--filter behave as they do over https.
+FIXTURES="$(cd "$(dirname "$0")" && pwd)/fixtures"
+TS_BARE="$TMPDIR_BASE/handbook.git"
+git init --bare "$TS_BARE" >/dev/null 2>&1
+git -C "$TS_BARE" config uploadpack.allowFilter true
+git -C "$TS_BARE" config uploadpack.allowAnySHA1InWant true
+TS_WORK="$TMPDIR_BASE/_ts_work"
+git clone "$TS_BARE" "$TS_WORK" >/dev/null 2>&1
+mkdir -p "$TS_WORK/team-skills/engineering/engineering-foo" \
+         "$TS_WORK/team-skills/marketing/marketing-bar" \
+         "$TS_WORK/archive" "$TS_WORK/files"
+cp "$FIXTURES/team-skills-install.sh" "$TS_WORK/team-skills/install.sh"
+chmod +x "$TS_WORK/team-skills/install.sh"
+printf -- '---\nname: engineering-foo\ndescription: foo\n---\n' > "$TS_WORK/team-skills/engineering/engineering-foo/SKILL.md"
+printf -- '---\nname: marketing-bar\ndescription: bar\n---\n' > "$TS_WORK/team-skills/marketing/marketing-bar/SKILL.md"
+printf 'big' > "$TS_WORK/archive/huge.bin"
+printf 'img' > "$TS_WORK/files/pic.png"
+printf '# Handbook\n' > "$TS_WORK/README.md"
+git -C "$TS_WORK" add -A >/dev/null 2>&1
+git -C "$TS_WORK" -c user.email="t@t" -c user.name="t" commit -m init >/dev/null 2>&1
+git -C "$TS_WORK" push origin HEAD:main >/dev/null 2>&1
+git -C "$TS_BARE" symbolic-ref HEAD refs/heads/main >/dev/null 2>&1
+TS_URL="file://$TS_BARE"
+
+PLUGIN_TS="$TMPDIR_BASE/plugin_ts"
+mkdir -p "$PLUGIN_TS"
+printf '{"handbooks":[{"id":"handbook","url":"%s","team_skills":"team-skills","label":"Company handbook"}]}\n' \
+    "$TS_URL" > "$PLUGIN_TS/handbooks.json"
+
+# run_ts <cache> <targets> [env...] — sets OUT_TS, ERR_TS, RC_TS.
+run_ts() {
+    cache="$1"; targets="$2"; shift 2
+    RC_TS=0
+    ERR_FILE="$TMPDIR_BASE/ts_err"
+    OUT_TS=$(env "$@" CLAUDE_PLUGIN_ROOT="$PLUGIN_TS" HANDBOOK_CACHE_DIR="$cache" \
+        OURSKY_SKILL_TARGETS="$targets" sh "$SCRIPT" 2>"$ERR_FILE") || RC_TS=$?
+    ERR_TS=$(cat "$ERR_FILE")
+}
+
+# ── Case (j): sparse clone, default team linked ──────────────────────────────
+CACHE_J="$TMPDIR_BASE/cache_j"; SK_J="$TMPDIR_BASE/home_j/skills"
+mkdir -p "$TMPDIR_BASE/home_j"
+run_ts "$CACHE_J" "$SK_J" A=1
+if [ $RC_TS -eq 0 ] \
+   && [ -L "$SK_J/engineering-foo" ] \
+   && [ ! -e "$SK_J/marketing-bar" ] \
+   && [ ! -e "$CACHE_J/handbook/archive" ] \
+   && [ ! -e "$CACHE_J/handbook/files" ] \
+   && [ -f "$CACHE_J/handbook/README.md" ] \
+   && printf '%s' "$OUT_TS" | grep -q 'team skills: engineering (1 linked)'; then
+    pass "case j: sparse clone skips archive/files, default team engineering linked"
+else
+    fail "case j: rc=$RC_TS link=$(ls "$SK_J" 2>&1) archive=$(ls "$CACHE_J/handbook" 2>&1) out='$OUT_TS' err='$ERR_TS'"
+fi
+
+# ── Case (k): second run on an existing sparse cache pulls and re-links ──────
+_work_serial=$((_work_serial + 1))
+git -C "$TS_WORK" pull -q origin main >/dev/null 2>&1
+mkdir -p "$TS_WORK/team-skills/engineering/engineering-new"
+printf -- '---\nname: engineering-new\ndescription: new\n---\n' > "$TS_WORK/team-skills/engineering/engineering-new/SKILL.md"
+git -C "$TS_WORK" add -A >/dev/null 2>&1
+git -C "$TS_WORK" -c user.email="t@t" -c user.name="t" commit -m new >/dev/null 2>&1
+git -C "$TS_WORK" push origin HEAD:main >/dev/null 2>&1
+run_ts "$CACHE_J" "$SK_J" A=1
+if [ $RC_TS -eq 0 ] && [ -L "$SK_J/engineering-new" ] \
+   && printf '%s' "$OUT_TS" | grep -q 'engineering (2 linked)'; then
+    pass "case k: pull on sparse cache picks up new skill and links it"
+else
+    fail "case k: rc=$RC_TS link=$(ls "$SK_J" 2>&1) out='$OUT_TS' err='$ERR_TS'"
+fi
+
+# ── Case (l): OURSKY_TEAMS selects another team ──────────────────────────────
+CACHE_L="$TMPDIR_BASE/cache_l"; SK_L="$TMPDIR_BASE/home_l/skills"
+mkdir -p "$TMPDIR_BASE/home_l"
+run_ts "$CACHE_L" "$SK_L" OURSKY_TEAMS=marketing
+if [ $RC_TS -eq 0 ] && [ -L "$SK_L/marketing-bar" ] && [ ! -e "$SK_L/engineering-foo" ] \
+   && printf '%s' "$OUT_TS" | grep -q 'team skills: marketing (1 linked)'; then
+    pass "case l: OURSKY_TEAMS=marketing links marketing only"
+else
+    fail "case l: rc=$RC_TS link=$(ls "$SK_L" 2>&1) out='$OUT_TS' err='$ERR_TS'"
+fi
+
+# ── Case (m): missing team folder warns, hook still exits 0 with JSON ────────
+CACHE_M="$TMPDIR_BASE/cache_m"; SK_M="$TMPDIR_BASE/home_m/skills"
+mkdir -p "$TMPDIR_BASE/home_m"
+run_ts "$CACHE_M" "$SK_M" OURSKY_TEAMS=nosuchteam
+if [ $RC_TS -eq 0 ] \
+   && printf '%s' "$OUT_TS" | grep -q '"hookEventName":"SessionStart"' \
+   && printf '%s' "$OUT_TS" | grep -q 'WARNING no team folder: nosuchteam' \
+   && [ -z "$(ls "$SK_M" 2>/dev/null)" ]; then
+    pass "case m: missing team folder warns in context, exit 0, nothing linked"
+else
+    fail "case m: rc=$RC_TS out='$OUT_TS' err='$ERR_TS'"
+fi
+
+# ── Case (n): installer failure warns, hook still exits 0 with JSON ──────────
+# Break the cached installer in place; the pull leaves a dirty-free file alone
+# only if unchanged upstream, so replace it after the clone.
+CACHE_N="$TMPDIR_BASE/cache_n"; SK_N="$TMPDIR_BASE/home_n/skills"
+mkdir -p "$TMPDIR_BASE/home_n"
+run_ts "$CACHE_N" "$SK_N" A=1
+printf '#!/bin/sh\necho boom >&2\nexit 3\n' > "$CACHE_N/handbook/team-skills/install.sh"
+run_ts "$CACHE_N" "$SK_N" A=1
+if [ $RC_TS -eq 0 ] \
+   && printf '%s' "$OUT_TS" | grep -q '"hookEventName":"SessionStart"' \
+   && printf '%s' "$OUT_TS" | grep -q 'WARNING install.sh exited 3: boom' \
+   && printf '%s' "$ERR_TS" | grep -q 'WARNING'; then
+    pass "case n: installer failure warns in context and stderr, exit 0"
+else
+    fail "case n: rc=$RC_TS out='$OUT_TS' err='$ERR_TS'"
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ $FAIL -eq 0 ]
