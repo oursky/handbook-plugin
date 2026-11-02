@@ -15,10 +15,18 @@ else
     run() { "$@"; }
 fi
 
+GIT_TERMINAL_PROMPT=0; export GIT_TERMINAL_PROMPT
+
+repo_path() {
+    printf '%s' "$1" | sed -e 's#^https://github.com/##' -e 's#^git@github.com:##' -e 's#\.git$##' -e 's#/$##'
+}
+
+ssh_url() { printf 'git@github.com:%s.git' "$(repo_path "$1")"; }
+
 # Clone into $2. A handbook that ships team skills is mostly image archives, so
 # it is fetched blobless and sparse (files/ at any depth, but never inside
 # team-skills); the others stay plain shallow clones.
-clone_handbook() {
+clone_once() {
     if [ "$3" = "-" ]; then
         run git clone --depth 1 --quiet "$1" "$2" 2>/dev/null
         return
@@ -26,6 +34,12 @@ clone_handbook() {
     run git clone --depth 1 --filter=blob:none --no-checkout --quiet "$1" "$2" 2>/dev/null \
         && run git -C "$2" sparse-checkout set --no-cone '/*' '!/archive/' '!files/' '/team-skills/' 2>/dev/null \
         && run git -C "$2" checkout --quiet 2>/dev/null
+}
+
+clone_handbook() {
+    clone_once "$1" "$2" "$3" && return 0
+    rm -rf "$2"
+    case "$1" in https://github.com/*) clone_once "$(ssh_url "$1")" "$2" "$3" ;; *) return 1 ;; esac
 }
 
 # Link the teams' skills with the handbook's own installer; echoes one status
@@ -120,7 +134,9 @@ while IFS="$(printf '\t')" read -r id url label team_skills; do
         fi
     else
         # Pull existing checkout.
-        git -C "$TARGET" remote set-url origin "$url" 2>/dev/null
+        have_url=$(git -C "$TARGET" remote get-url origin 2>/dev/null)
+        [ "$(repo_path "$have_url")" = "$(repo_path "$url")" ] \
+            || git -C "$TARGET" remote set-url origin "$url" 2>/dev/null
         if run git -C "$TARGET" pull --ff-only --quiet 2>/dev/null; then
             sha=$(git -C "$TARGET" rev-parse --short HEAD 2>/dev/null || printf 'unknown')
         else
