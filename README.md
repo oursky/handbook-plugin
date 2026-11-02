@@ -2,7 +2,7 @@
 
 Claude Code plugin exposing Oursky's private handbooks to agents as read-only reference.
 
-**v0.3.0** — multi-handbook support, manual sync, usage reporting.
+**v0.4.0** — also syncs the company handbook and links its team skills.
 
 ## Install
 
@@ -15,8 +15,18 @@ Restart Claude Code, then ask something like "what's our branch naming conventio
 to confirm it routes to the handbook.
 
 This repo is public, but the handbooks it syncs are not — you need `jq`
-(`brew install jq` / `apt install jq`) and SSH access to `oursky/handbook-dev` and
-`oursky/os-project-management`. They sync to `~/.cache/oursky-handbook/` at session start.
+(`brew install jq` / `apt install jq`) and read access to `oursky/handbook-dev`,
+`oursky/os-project-management` and `oursky/handbook`. They sync to
+`~/.cache/oursky-handbook/` at session start over https, so run `gh auth setup-git`
+first; on a dev machine with SSH keys, an `insteadOf` rule
+(`git config --global url."git@github.com:".insteadOf https://github.com/`) works too.
+
+The session start hook also clones `oursky/handbook` (blobless and sparse, without the
+image folders) and runs its `team-skills/install.sh`, which links the `engineering` team's
+skills into `~/.claude/skills`, `~/.codex/skills` and `~/.config/opencode/skills`. Set
+`OURSKY_TEAMS="engineering sales"` to pick other teams, and `OURSKY_SKILL_TARGETS` to a
+space-separated list of directories to change where the links go. Each session start
+re-syncs the links, so new skills arrive with the next pull.
 
 To update:
 
@@ -59,7 +69,7 @@ Add one entry to `handbooks.json` — no script edits needed:
 ```json
 {
   "id": "pm",
-  "url": "git@github.com:oursky/os-project-management.git",
+  "url": "https://github.com/oursky/os-project-management.git",
   "topic_root": "usage-guide/",
   "depth": 0,
   "label": "Oursky PM workflow handbook"
@@ -69,7 +79,8 @@ Add one entry to `handbooks.json` — no script edits needed:
 | Field | Purpose |
 |---|---|
 | `id` | Skill-name prefix (`dev-git`) and cache subdirectory |
-| `url` | SSH clone URL |
+| `url` | https clone URL |
+| `team_skills` | Optional. Folder in the repo holding `install.sh` and team skills; such an entry has no `topic_root` and is skipped by the generator |
 | `topic_root` | Path within the repo containing topic directories |
 | `depth` | `0` = `topic_root` is itself one topic; `1` = its immediate subdirs are topics |
 | `label` | Corpus name used in clause 1 of each skill description, so two handbooks can share trigger nouns |
