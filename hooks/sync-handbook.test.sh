@@ -335,6 +335,20 @@ else
     fail "case o: url1='$URL_O' url2='$URL_O2'"
 fi
 
+# ── Case (p): reloadSkills is set only when skills were linked ───────────────
+run_ts "$TMPDIR_BASE/cache_p1" "$TMPDIR_BASE/home_p1/skills" A=1
+mkdir -p "$TMPDIR_BASE/home_p1"
+LINKED_P=$(printf '%s' "$OUT_TS" | jq -r '.hookSpecificOutput.reloadSkills')
+run_ts "$TMPDIR_BASE/cache_p2" "$TMPDIR_BASE/home_p2/skills" OURSKY_TEAMS=nosuchteam
+MISSING_P=$(printf '%s' "$OUT_TS" | jq -r '.hookSpecificOutput | has("reloadSkills")')
+OUT_NONE=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_SINGLE" HANDBOOK_CACHE_DIR="$TMPDIR_BASE/cache_p3" sh "$SCRIPT" 2>/dev/null)
+NONE_P=$(printf '%s' "$OUT_NONE" | jq -r '.hookSpecificOutput | has("reloadSkills")')
+if [ "$LINKED_P" = "true" ] && [ "$MISSING_P" = "false" ] && [ "$NONE_P" = "false" ]; then
+    pass "case p: reloadSkills true when skills linked, absent for missing team and no team_skills"
+else
+    fail "case p: linked='$LINKED_P' missing_team='$MISSING_P' no_team_skills='$NONE_P'"
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ $FAIL -eq 0 ]

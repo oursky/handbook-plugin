@@ -2,7 +2,7 @@
 
 Claude Code plugin exposing Oursky's private handbooks to agents as read-only reference.
 
-**v0.4.0** — also syncs the company handbook and links its team skills.
+**v0.4.1** — also syncs the company handbook and links its team skills.
 
 ## Install
 
@@ -26,7 +26,7 @@ image folders) and runs its `team-skills/install.sh`, which links the `engineeri
 skills into `~/.claude/skills`, `~/.codex/skills` and `~/.config/opencode/skills`. Set
 `OURSKY_TEAMS="engineering sales"` to pick other teams, and `OURSKY_SKILL_TARGETS` to a
 space-separated list of directories to change where the links go. Each session start
-re-syncs the links, so new skills arrive with the next pull.
+re-syncs the links, so new skills arrive with the next pull. The hook also asks Claude Code to reload skills, so a first session sees the new links.
 
 To update:
 
