@@ -349,6 +349,34 @@ else
     fail "case p: linked='$LINKED_P' missing_team='$MISSING_P' no_team_skills='$NONE_P'"
 fi
 
+# ── Case (q): handbooks sync concurrently, context keeps declared order ──────
+# The shim delays each clone (first repo 4 s, second 3 s); sequential would take 7 s.
+SHIM_Q="$TMPDIR_BASE/shim_q"; mkdir -p "$SHIM_Q"
+REAL_GIT=$(command -v git)
+cat > "$SHIM_Q/git" <<SHIM
+#!/bin/sh
+if [ "\$1" = clone ]; then
+    case "\$*" in *bare2.git*) sleep 3 ;; *) sleep 4 ;; esac
+fi
+exec "$REAL_GIT" "\$@"
+SHIM
+chmod +x "$SHIM_Q/git"
+PLUGIN_Q="$TMPDIR_BASE/plugin_q"; mkdir -p "$PLUGIN_Q"
+write_handbooks_json "$PLUGIN_Q" \
+    slow "$BARE_REPO"  "Slow handbook" \
+    fast "$BARE_REPO2" "Fast handbook"
+T0=$(date +%s)
+OUT_Q=$(PATH="$SHIM_Q:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_Q" HANDBOOK_CACHE_DIR="$TMPDIR_BASE/cache_q" sh "$SCRIPT" 2>/dev/null)
+ELAPSED_Q=$(( $(date +%s) - T0 ))
+CTX_Q=$(printf '%s' "$OUT_Q" | jq -r '.hookSpecificOutput.additionalContext')
+case "$CTX_Q" in "Slow handbook (slow)"*"Fast handbook (fast)"*) ORDER_Q=ok ;; *) ORDER_Q=bad ;; esac
+if [ "$ELAPSED_Q" -lt 6 ] && [ "$ORDER_Q" = ok ] \
+   && [ -f "$TMPDIR_BASE/cache_q/slow/README.md" ] && [ -f "$TMPDIR_BASE/cache_q/fast/README.md" ]; then
+    pass "case q: two delayed clones run concurrently (${ELAPSED_Q}s), context in declared order"
+else
+    fail "case q: elapsed=${ELAPSED_Q}s (want <6), order=$ORDER_Q, ctx='$CTX_Q'"
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ $FAIL -eq 0 ]
