@@ -15,6 +15,52 @@ else
     run() { "$@"; }
 fi
 
+# Clone into $2. A handbook that ships team skills is mostly image archives, so
+# it is fetched blobless and sparse (files/ at any depth, but never inside
+# team-skills); the others stay plain shallow clones.
+clone_handbook() {
+    if [ "$3" = "-" ]; then
+        run git clone --depth 1 --quiet "$1" "$2" 2>/dev/null
+        return
+    fi
+    run git clone --depth 1 --filter=blob:none --no-checkout --quiet "$1" "$2" 2>/dev/null \
+        && run git -C "$2" sparse-checkout set --no-cone '/*' '!/archive/' '!files/' '/team-skills/' 2>/dev/null \
+        && run git -C "$2" checkout --quiet 2>/dev/null
+}
+
+# Link the teams' skills with the handbook's own installer; echoes one status
+# fragment. A failure becomes a warning in the fragment, never a hook failure.
+install_team_skills() {
+    dir="$1/$2"
+    installer="$dir/install.sh"
+    teams="${OURSKY_TEAMS:-engineering}"
+    if [ ! -x "$installer" ]; then
+        printf 'team skills: WARNING %s not found in checkout' "$installer"
+        return
+    fi
+    have="" missing=""
+    for t in $teams; do
+        if [ -d "$dir/$t" ]; then have="$have $t"; else missing="$missing $t"; fi
+    done
+    note=""
+    [ -n "$missing" ] && note=" (WARNING no team folder:${missing})"
+    if [ -z "$have" ]; then
+        printf 'team skills: WARNING nothing to install%s' "$note"
+        return
+    fi
+    # shellcheck disable=SC2086
+    if out=$(run "$installer" $have 2>&1); then
+        n=$(printf '%s\n' "$out" | sed -n 's/^Installed \([0-9]*\) skill.*/\1/p')
+        w=$(printf '%s\n' "$out" | grep -c '^warning:')
+        [ "$w" -gt 0 ] && note="$note (WARNING installer: $w warning(s))"
+        printf 'team skills:%s (%s linked)%s' "$have" "${n:-?}" "$note"
+    else
+        rc=$?
+        printf 'team skills: WARNING install.sh exited %s: %s%s' "$rc" \
+            "$(printf '%s' "$out" | tail -n 1)" "$note"
+    fi
+}
+
 # jq is required to parse handbooks.json.
 if ! command -v jq >/dev/null 2>&1; then
     printf 'handbook: jq is required but not installed; sync skipped\n' >&2
@@ -42,8 +88,10 @@ trap 'rm -f "$STATUS_FILE"' EXIT
 
 # AC-2: iterate over every declared handbook.
 # One failing handbook warns, keeps its stale cache, and does not abort the loop.
-jq -r '.handbooks[] | "\(.id)\t\(.url)\t\(.label)"' "$HANDBOOKS_JSON" | \
-while IFS="$(printf '\t')" read -r id url label; do
+# team_skills is last and "-" when absent: tab is whitespace to read, so an
+# empty middle field would collapse.
+jq -r '.handbooks[] | "\(.id)\t\(.url)\t\(.label)\t\(.team_skills // "-")"' "$HANDBOOKS_JSON" | \
+while IFS="$(printf '\t')" read -r id url label team_skills; do
     TARGET="${CACHE_ROOT}/${id}"
 
     if [ ! -d "${TARGET}/.git" ]; then
@@ -56,7 +104,7 @@ while IFS="$(printf '\t')" read -r id url label; do
             # Fresh clone via atomic tmp-then-mv.
             # rm -rf targets only the temp path, never the cache dir.
             TMPCLONE="${TARGET}.tmp.$$"
-            if run git clone --depth 1 --quiet "$url" "$TMPCLONE" 2>/dev/null; then
+            if clone_handbook "$url" "$TMPCLONE" "$team_skills"; then
                 if mv "$TMPCLONE" "$TARGET" 2>/dev/null; then
                     sha=$(git -C "$TARGET" rev-parse --short HEAD 2>/dev/null || printf 'unknown')
                 else
@@ -82,6 +130,12 @@ while IFS="$(printf '\t')" read -r id url label; do
     fi
 
     printf '%s (%s) at %s [%s]\n' "$label" "$id" "$TARGET" "$sha" >> "$STATUS_FILE"
+
+    if [ "$team_skills" != "-" ] && [ "$sha" != "no-cache" ]; then
+        frag=$(install_team_skills "$TARGET" "$team_skills")
+        printf '%s\n' "$frag" >> "$STATUS_FILE"
+        case "$frag" in *WARNING*) printf 'handbook[%s]: %s\n' "$id" "$frag" >&2 ;; esac
+    fi
 done
 
 # Build the additionalContext string from accumulated status lines.
