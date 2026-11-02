@@ -316,6 +316,25 @@ else
     fail "case n: rc=$RC_TS out='$OUT_TS' err='$ERR_TS'"
 fi
 
+CACHE_O="$TMPDIR_BASE/cache_o"
+mkdir -p "$CACHE_O"
+git clone -q "$BARE_REPO" "$CACHE_O/dev" >/dev/null 2>&1
+git -C "$CACHE_O/dev" remote set-url origin git@github.com:oursky/handbook-dev.git
+PLUGIN_O="$TMPDIR_BASE/plugin_o"; mkdir -p "$PLUGIN_O"
+write_handbooks_json "$PLUGIN_O" dev "https://github.com/oursky/handbook-dev.git" "Engineering handbook"
+OUT_O=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_O" HANDBOOK_CACHE_DIR="$CACHE_O" sh "$SCRIPT" 2>/dev/null)
+URL_O=$(git -C "$CACHE_O/dev" remote get-url origin)
+git -C "$CACHE_O/dev" remote set-url origin git@github.com:oursky/other.git
+OUT_O2=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_O" HANDBOOK_CACHE_DIR="$CACHE_O" sh "$SCRIPT" 2>/dev/null)
+URL_O2=$(git -C "$CACHE_O/dev" remote get-url origin)
+if [ "$URL_O" = "git@github.com:oursky/handbook-dev.git" ] \
+   && [ "$URL_O2" = "https://github.com/oursky/handbook-dev.git" ] \
+   && printf '%s' "$OUT_O$OUT_O2" | grep -q '"hookEventName":"SessionStart"'; then
+    pass "case o: same repo keeps SSH remote; a different repo is repointed"
+else
+    fail "case o: url1='$URL_O' url2='$URL_O2'"
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ $FAIL -eq 0 ]
