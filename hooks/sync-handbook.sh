@@ -67,6 +67,8 @@ install_team_skills() {
         n=$(printf '%s\n' "$out" | sed -n 's/^Installed \([0-9]*\) skill.*/\1/p')
         w=$(printf '%s\n' "$out" | grep -c '^warning:')
         [ "$w" -gt 0 ] && note="$note (WARNING installer: $w warning(s))"
+        # The function runs in a subshell, so signal the reload through a file.
+        [ "${n:-0}" -gt 0 ] && printf 1 > "$RELOAD_FILE"
         printf 'team skills:%s (%s linked)%s' "$have" "${n:-?}" "$note"
     else
         rc=$?
@@ -98,7 +100,8 @@ fi
 # Accumulate per-handbook status lines in a temp file so we can build the
 # additionalContext string after the pipe subshell finishes.
 STATUS_FILE="$(mktemp)"
-trap 'rm -f "$STATUS_FILE"' EXIT
+RELOAD_FILE="$(mktemp)"
+trap 'rm -f "$STATUS_FILE" "$RELOAD_FILE"' EXIT
 
 # AC-2: iterate over every declared handbook.
 # One failing handbook warns, keeps its stale cache, and does not abort the loop.
@@ -160,5 +163,11 @@ if [ -z "$context" ]; then
     context="No handbooks declared in ${HANDBOOKS_JSON}"
 fi
 
-jq -cn --arg ctx "$context" \
-    '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":$ctx}}'
+# Skills linked during this run are missing from the startup skill list;
+# reloadSkills makes Claude Code rescan them once the hooks finish.
+reload=false
+[ -s "$RELOAD_FILE" ] && reload=true
+
+jq -cn --arg ctx "$context" --argjson reload "$reload" \
+    '{"hookSpecificOutput": ({"hookEventName":"SessionStart","additionalContext":$ctx}
+        + (if $reload then {"reloadSkills":true} else {} end))}'
