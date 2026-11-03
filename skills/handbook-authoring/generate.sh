@@ -6,7 +6,7 @@
 # Drafts a placeholder description only for brand-new skill files; marks it DRAFT.
 #
 # Usage:
-#   generate.sh [--check] [--threshold N]
+#   generate.sh [--check] [--threshold N] | --mark-reviewed <skill>...|all  (see SKILL.md)
 #
 #   --check       Report duplicate trigger nouns only; do not generate files.
 #   --threshold N Skip topics with fewer than N .md files (default: 3).
@@ -23,11 +23,14 @@ CACHE_ROOT="${HANDBOOK_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/oursky-handboo
 # ── defaults ─────────────────────────────────────────────────────────────────
 MIN_FILES=3   # withholding threshold: skip topics with fewer than this many .md files
 MODE="generate"
+MARK_TARGETS=()
 
 # ── argument parsing ──────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --check)      MODE="check"; shift ;;
+        --mark-reviewed) MODE="mark"; shift
+                      while [[ $# -gt 0 && "$1" != --* ]]; do MARK_TARGETS+=("$1"); shift; done ;;
         --threshold)  MIN_FILES="$2"; shift 2 ;;
         --threshold=*)MIN_FILES="${1#*=}"; shift ;;
         *) echo "Unknown argument: $1" >&2; exit 1 ;;
@@ -54,6 +57,100 @@ extract_nouns() {
         | grep -v -E '^(use|when|asking|about|how|to|the|a|an|and|or|for|on|in|from|with|of|this|is|are|at|by|as|it|its|our|oursky|handbook|guidance|skill|skills|covers|writing|write|create|run|running|generate|generating|making|make|listing|list|plan|planning|review|reviewing|fill|filling|log|logging|draft|drafting|submit|submitting|file|filing|get|getting|engineering|workflow|pm|dev|management)$' \
         | grep -v -E '^.{1,2}$' \
         || true
+}
+
+REVIEW_MARKER_RE='<!-- handbook-reviewed: ([0-9a-f]{7,40}) -->'
+
+# Print the review marker's commit, or nothing when the skill has none.
+read_review_marker() {
+    local line
+    line=$(grep -m1 -E "$REVIEW_MARKER_RE" "$1" 2>/dev/null) || return 0
+    [[ "$line" =~ $REVIEW_MARKER_RE ]] && printf '%s' "${BASH_REMATCH[1]}"
+}
+
+# Set the review marker to <sha>, inserting it after the frontmatter if absent.
+write_review_marker() {
+    local skill_file="$1" sha="$2" marker="<!-- handbook-reviewed: $2 -->"
+    if grep -qE "$REVIEW_MARKER_RE" "$skill_file"; then
+        sed -E -i "s/$REVIEW_MARKER_RE/$marker/" "$skill_file"
+    else
+        awk -v m="$marker" '
+            { print }
+            /^---$/ && ++fences == 2 && !done { print ""; print m; done=1 }
+        ' "$skill_file" > "${skill_file}.tmp" && mv "${skill_file}.tmp" "$skill_file"
+    fi
+}
+
+report_review_drift() {
+    local skill_name="$1" skill_file="$2" cache_hb="$3" rel_topic="$4"
+    local topic_name; topic_name="$(basename "$rel_topic")"
+    local reviewed head
+    reviewed="$(read_review_marker "$skill_file")"
+    head="$(git -C "$cache_hb" rev-parse HEAD 2>/dev/null)" || return 0
+    if [[ -z "$reviewed" ]]; then
+        echo "  REVIEW $skill_name: no review marker; check its text, then run --mark-reviewed $skill_name"
+        return 0
+    fi
+    [[ "$head" == "$reviewed"* ]] && return 0
+    # Caches are shallow clones; a diff only needs the reviewed commit's tree.
+    if ! git -C "$cache_hb" cat-file -e "${reviewed}^{commit}" 2>/dev/null; then
+        GIT_TERMINAL_PROMPT=0 git -C "$cache_hb" fetch --quiet --depth=1 origin "$reviewed" 2>/dev/null || true
+    fi
+    if ! git -C "$cache_hb" cat-file -e "${reviewed}^{commit}" 2>/dev/null; then
+        echo "  REVIEW $skill_name: reviewed commit ${reviewed:0:7} is not in the cache; check its text, then run --mark-reviewed $skill_name"
+        return 0
+    fi
+    local -a changes=()
+    local status old new
+    while IFS=$'\t' read -r status old new; do
+        [[ "$old" == *.md || "$new" == *.md ]] || continue
+        case "$status" in
+            M)   [[ "$(dirname "$old")" == "$rel_topic" ]] && changes+=("modified  ${old#./}") ;;
+            A)   [[ "$(dirname "$old")" == "$rel_topic" ]] && changes+=("added     ${old#./}") ;;
+            D)   [[ "$(basename "$(dirname "$old")")" == "$topic_name" ]] && changes+=("deleted   $old") ;;
+            R*)  if [[ "$(dirname "$new")" == "$rel_topic" ]]; then
+                     [[ "$status" == R100 ]] || changes+=("modified  ${new#./} (moved from $old)")
+                 elif [[ "$(basename "$(dirname "$old")")" == "$topic_name" ]]; then
+                     changes+=("moved out $old -> $new")
+                 fi ;;
+        esac
+    done < <(git -C "$cache_hb" diff --name-status -M "$reviewed" "$head")
+    [[ ${#changes[@]} -eq 0 ]] && return 0
+    echo "  REVIEW $skill_name: ${#changes[@]} file(s) changed since ${reviewed:0:7}; check the description and summaries, then run --mark-reviewed $skill_name"
+    printf '    %s\n' "${changes[@]}"
+}
+
+# ── mark-reviewed mode ───────────────────────────────────────────────────────
+run_mark_reviewed() {
+    if [[ ${#MARK_TARGETS[@]} -eq 0 ]]; then
+        echo "Usage: generate.sh --mark-reviewed <skill>... | all" >&2
+        exit 1
+    fi
+    local -a targets=("${MARK_TARGETS[@]}")
+    if [[ "${targets[0]}" == "all" ]]; then
+        targets=()
+        local hb_id d
+        while IFS= read -r hb_id; do
+            for d in "$SKILLS_DIR/$hb_id"-*/; do
+                [[ -f "$d/SKILL.md" ]] && targets+=("$(basename "$d")")
+            done
+        done < <(jq -r '.handbooks[] | select(.topic_root) | .id' "$HANDBOOKS_JSON")
+    fi
+    local skill hb_id skill_file head status=0
+    for skill in "${targets[@]}"; do
+        skill_file="$SKILLS_DIR/$skill/SKILL.md"
+        hb_id="$(jq -r --arg s "$skill" '.handbooks[] | select(.topic_root) | .id
+            | select(. as $id | $s | startswith($id + "-"))' "$HANDBOOKS_JSON" | head -1)"
+        if [[ ! -f "$skill_file" || -z "$hb_id" ]]; then
+            echo "  SKIP $skill: not a generated handbook skill" >&2; status=1; continue
+        fi
+        if ! head="$(git -C "$CACHE_ROOT/$hb_id" rev-parse HEAD 2>/dev/null)"; then
+            echo "  SKIP $skill: no cache for handbook '$hb_id'" >&2; status=1; continue
+        fi
+        write_review_marker "$skill_file" "$head"
+        echo "  Marked $skill reviewed at ${head:0:7}"
+    done
+    return "$status"
 }
 
 # ── check mode ────────────────────────────────────────────────────────────────
@@ -247,9 +344,15 @@ ${file_lines}
 3. For an exact-string lookup (e.g. a config value, command, or rule):
    \`rg -l "search term" "${cache_topic_path}/"\`
 EOF
+        local cache_head
+        cache_head="$(git -C "$CACHE_ROOT/$hb_id" rev-parse HEAD 2>/dev/null)" \
+            && write_review_marker "$skill_file" "$cache_head"
+        echo "  Written: $skill_file"
+        return 0
     fi
 
     echo "  Written: $skill_file"
+    report_review_drift "$skill_name" "$skill_file" "$CACHE_ROOT/$hb_id" "$rel_topic"
 }
 
 # ── main: generate mode ───────────────────────────────────────────────────────
@@ -360,4 +463,5 @@ RELOAD
 case "$MODE" in
     check)    run_check ;;
     generate) run_generate ;;
+    mark)     run_mark_reviewed ;;
 esac

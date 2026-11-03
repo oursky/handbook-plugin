@@ -63,11 +63,41 @@ For each handbook in `handbooks.json` the script:
      `description:` line unchanged; rewrites only the file listing in the body.
    - If the file is **new**: writes a full skeleton with a `DRAFT` description
      for human review before the skill is considered complete.
+   - Prints a `REVIEW` block listing the topic's files that changed upstream
+     since the skill was last reviewed (see below).
 4. Prints reload instructions for both load paths (see below).
 
 Output files are `skills/<id>-<topic>/SKILL.md`, one per qualifying topic.
 File-level annotations (`— [add one-line description]`) are placeholders; fill them
 in by hand before merging.
+
+### Review drift
+
+Regeneration only tracks which files exist. When a handbook file's content
+changes, the listing stays the same, so the skill's `description:` and that
+file's one-line summary can go stale without any diff. To catch that, each skill
+carries a marker right after its frontmatter:
+
+```markdown
+<!-- handbook-reviewed: <handbook commit sha> -->
+```
+
+It names the handbook commit the skill's text was last checked against. On every
+regen, `generate.sh` diffs that commit against the cache HEAD and prints the
+topic's files that were modified, added, deleted or moved out (pure renames are
+skipped). Caches are shallow clones, so a missing reviewed commit is fetched on
+demand. New skills get the current HEAD as their marker.
+
+After checking a flagged skill's description and summaries against the changed
+files, record it:
+
+```bash
+bash skills/handbook-authoring/generate.sh --mark-reviewed dev-security dev-git
+bash skills/handbook-authoring/generate.sh --mark-reviewed all
+```
+
+`--mark-reviewed` sets the marker to the handbook cache's current HEAD. Run it
+only after the review; marking without reading hides drift.
 
 ---
 

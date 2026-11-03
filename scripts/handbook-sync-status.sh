@@ -91,4 +91,6 @@ if [ "$REGEN" = "1" ]; then
     CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
         bash "${PLUGIN_ROOT}/skills/handbook-authoring/generate.sh"
     printf '\nNote: generate.sh never rewrites an existing description: line.\n'
+    printf 'REVIEW lines list handbook files changed since a skill was last reviewed; update its\n'
+    printf 'description and summaries, then run generate.sh --mark-reviewed <skill>.\n'
 fi
