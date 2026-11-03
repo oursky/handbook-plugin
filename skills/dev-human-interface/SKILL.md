@@ -4,6 +4,8 @@ description: "Human interface guidance from Oursky's engineering handbook. Use w
 user-invocable: false
 ---
 
+<!-- handbook-reviewed: 2b4ec2b12888e9476357b2dbfccfab00d46ad1da -->
+
 ## Cache root
 
 CACHE="${HANDBOOK_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/oursky-handbook}"

@@ -4,6 +4,8 @@ description: "PM workflow handbook for Oursky's project management skills. Use w
 user-invocable: false
 ---
 
+<!-- handbook-reviewed: 059168363fb7319b7db35a18dd8760206d807579 -->
+
 ## Cache root
 
 CACHE="${HANDBOOK_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/oursky-handbook}"
