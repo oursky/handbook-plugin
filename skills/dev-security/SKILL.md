@@ -1,6 +1,6 @@
 ---
 name: dev-security
-description: "Security guidance from Oursky's engineering handbook. Use when asking about secrets, GPG, SOPS, incident response, package audit, secure SDLC, maintaining a dormant codebase, or how to keep a new project secure."
+description: "Security guidance from Oursky's engineering handbook. Use when asking about secrets, GPG, SOPS, package audit, secure SDLC, maintaining a dormant codebase, or how to keep a new project secure."
 user-invocable: false
 ---
 

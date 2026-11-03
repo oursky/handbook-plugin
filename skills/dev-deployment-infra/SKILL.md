@@ -10,9 +10,9 @@ CACHE="${HANDBOOK_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/oursky-handbook}"
 
 ## Files in this topic
 
-- deployment-infra/index.md — cluster environments (agentic, pandawork, oursky.app), Docker registry conventions, VM/k3s setup
-- deployment-infra/agentic-provision.md — namespace, database, and block storage provisioning on agentic.oursky.cloud
-- deployment-infra/client-deployment.md — hosting and database decision guide for client projects; cloud billing setup for AWS/GCP/Azure
+- deployment-infra/index.md — which cluster per environment (agentic dev/staging, pandawork staging, k8s.oursky.app production), ingress/TLS values per cluster, VM-based hosting
+- deployment-infra/agentic-provision.md — namespace, database, and RustFS block storage provisioning on agentic.oursky.cloud via halyard jobs
+- deployment-infra/client-deployment.md — hosting and database decision guide for client projects
 - deployment-infra/gcp-blockstorage.md — GCS bucket provisioning and service account setup for block storage
 - deployment-infra/gcp-database.md — Cloud SQL database provisioning and access setup on GCP
 - deployment-infra/kubernetes-admin.md — Kubernetes namespace creation and access management
