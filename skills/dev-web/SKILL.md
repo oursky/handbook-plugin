@@ -10,12 +10,12 @@ CACHE="${HANDBOOK_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/oursky-handbook}"
 
 ## Files in this topic
 
-- guides/web/index.md — topic overview table; orient here, then read the relevant file below
-- guides/web/localization-react.md — react-intl setup, ICU MessageFormat skeletons, displaying locale names
-- guides/web/seo-requirements.md — baseline SEO checklist: PageSpeed, og tags, HTTPS, SSL grade, hreflang, 404
-- guides/web/url-design.md — base64url encoding for UUID slugs; why and how to implement
-- guides/web/web-navigation-practices.md — page titles, URL slugs, breadcrumbs, modals, search state in URL
-- guides/web/web-performance.md — async/defer scripts, parcel code-splitting, CDN, static file serving rules
+- web/index.md — topic overview table; orient here, then read the relevant file below
+- web/localization-react.md — react-intl setup, ICU MessageFormat skeletons, displaying locale names
+- web/seo-requirements.md — baseline SEO checklist: PageSpeed, og tags, HTTPS, SSL grade, hreflang, 404
+- web/url-design.md — base64url encoding for UUID slugs; why and how to implement
+- web/web-navigation-practices.md — page titles, URL slugs, breadcrumbs, modals, search state in URL
+- web/web-performance.md — async/defer scripts, parcel code-splitting, CDN, static file serving rules
 
 ## How to answer
 

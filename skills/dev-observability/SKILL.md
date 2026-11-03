@@ -10,13 +10,13 @@ CACHE="${HANDBOOK_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/oursky-handbook}"
 
 ## Files in this topic
 
-- guides/observability/index.md — topic overview table; consult to orient, then read the relevant file
-- guides/observability/add-otel-metrics.md — how to wire up OTel metrics, required env vars, and cluster-specific OTLP endpoints
-- guides/observability/application-logging.md — logging standards for Python and .NET; logger naming, sink routing, sensitive-message handling
-- guides/observability/otel-browser.md — browser OTel status (2025), limitations, and viable exporter and auth options
-- guides/observability/third-party-log-config.md — how to quiet PgBouncer stats logs and nginx health-check access logs
-- guides/observability/uptime-crash-logging.md — Sentry project naming, alert rules, and production uptime monitoring with updown.io
-- guides/observability/visualize-k6-results.md — run k6 load tests and view time-series dashboards via InfluxDB + Grafana
+- observability/index.md — topic overview table; consult to orient, then read the relevant file
+- observability/add-otel-metrics.md — how to wire up OTel metrics, required env vars, and cluster-specific OTLP endpoints
+- observability/application-logging.md — logging standards for Python and .NET; logger naming, sink routing, sensitive-message handling
+- observability/otel-browser.md — browser OTel status (2025), limitations, and viable exporter and auth options
+- observability/third-party-log-config.md — how to quiet PgBouncer stats logs and nginx health-check access logs
+- observability/uptime-crash-logging.md — Sentry project naming, alert rules, and production uptime monitoring with updown.io
+- observability/visualize-k6-results.md — run k6 load tests and view time-series dashboards via InfluxDB + Grafana
 
 ## How to answer
 

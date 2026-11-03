@@ -10,9 +10,9 @@ CACHE="${HANDBOOK_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/oursky-handbook}"
 
 ## Files in this topic
 
-- guides/human-interface/frontend-styling-basics.md — foundational CSS rules for buttons, typography, layout, images, and common styling mistakes
-- guides/human-interface/design-engineering-checklist.md — pre-coding checklist to review with designer: component states, adaptive design, platform feasibility
-- guides/human-interface/index.md — topic overview table (orient here, then read the relevant file above)
+- human-interface/frontend-styling-basics.md — foundational CSS rules for buttons, typography, layout, images, and common styling mistakes
+- human-interface/design-engineering-checklist.md — pre-coding checklist to review with designer: component states, adaptive design, platform feasibility
+- human-interface/index.md — topic overview table (orient here, then read the relevant file above)
 
 ## How to answer
 
