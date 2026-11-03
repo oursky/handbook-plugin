@@ -3,7 +3,7 @@
     {
       "id": "dev",
       "url": "https://github.com/oursky/handbook-dev.git",
-      "topic_root": "guides/",
+      "topic_root": "./",
       "depth": 1,
       "label": "Oursky engineering handbook"
     },

@@ -277,7 +277,10 @@ run_generate() {
             continue
         fi
 
-        local topic_root_abs="$cache_hb/${hb_topic_root%/}"
+        # "" or "./" means the topics sit at the top level of the handbook repo.
+        local topic_root_trimmed="${hb_topic_root%/}"
+        [[ "$topic_root_trimmed" == "." ]] && topic_root_trimmed=""
+        local topic_root_abs="$cache_hb${topic_root_trimmed:+/$topic_root_trimmed}"
         if [[ ! -d "$topic_root_abs" ]]; then
             echo "  SKIP: topic_root '$hb_topic_root' not found under $cache_hb"
             echo ""
@@ -287,11 +290,11 @@ run_generate() {
         # Walk subdirectories of topic_root at hb_depth levels.
         # Fallback: if topic_root has no subdirectories, treat topic_root itself
         # as the single topic (handles flat handbooks like pm/usage-guide/).
-        local topic_root_trimmed="${hb_topic_root%/}"
+        # Hidden directories (.git, .agents, .claude) are never topics.
         local -a topic_dirs=()
         while IFS= read -r d; do
             topic_dirs+=("$d")
-        done < <(find "$topic_root_abs" -mindepth "$hb_depth" -maxdepth "$hb_depth" -type d | sort)
+        done < <(find "$topic_root_abs" -mindepth "$hb_depth" -maxdepth "$hb_depth" -type d ! -name '.*' | sort)
 
         if [[ ${#topic_dirs[@]} -eq 0 ]]; then
             # No subdirs found — treat topic_root itself as the sole topic
@@ -310,9 +313,9 @@ run_generate() {
             # Build rel_topic: if this IS the topic_root, rel = topic_root_trimmed;
             # otherwise rel = topic_root_trimmed/topic_name
             if [[ "$topic_dir" == "$topic_root_abs" ]]; then
-                rel_topic="$topic_root_trimmed"
+                rel_topic="${topic_root_trimmed:-.}"
             else
-                rel_topic="${topic_root_trimmed}/${topic_name}"
+                rel_topic="${topic_root_trimmed:+$topic_root_trimmed/}${topic_name}"
             fi
             generate_skill "$hb_id" "$hb_label" "$rel_topic" "$topic_dir"
             ((generated++)) || true

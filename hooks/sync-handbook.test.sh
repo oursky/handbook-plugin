@@ -21,7 +21,7 @@ write_handbooks_json() {
     entries=""
     while [ $# -ge 3 ]; do
         id="$1"; url="$2"; label="$3"; shift 3
-        entry="$(printf '{"id":"%s","url":"%s","topic_root":"guides/","depth":1,"label":"%s"}' \
+        entry="$(printf '{"id":"%s","url":"%s","topic_root":"./","depth":1,"label":"%s"}' \
             "$id" "$url" "$label")"
         if [ -z "$entries" ]; then
             entries="$entry"
