@@ -11,6 +11,10 @@ trap 'rm -rf "$TMPDIR_BASE"' EXIT
 PASS=0
 FAIL=0
 
+# Cases a-q exercise the pull itself, so they pull in the foreground. Cases r-u
+# unset this to test the default behaviour.
+HANDBOOK_SYNC_FOREGROUND=1; export HANDBOOK_SYNC_FOREGROUND
+
 pass() { printf 'PASS: %s\n' "$1"; PASS=$((PASS+1)); }
 fail() { printf 'FAIL: %s\n' "$1"; FAIL=$((FAIL+1)); }
 
@@ -375,6 +379,145 @@ if [ "$ELAPSED_Q" -lt 6 ] && [ "$ORDER_Q" = ok ] \
     pass "case q: two delayed clones run concurrently (${ELAPSED_Q}s), context in declared order"
 else
     fail "case q: elapsed=${ELAPSED_Q}s (want <6), order=$ORDER_Q, ctx='$CTX_Q'"
+fi
+
+# ── Background refresh cases (r–u) ───────────────────────────────────────────
+now_ms() { date +%s%3N; }
+
+# wait_for <command...> — poll up to 10 s for the command to succeed.
+wait_for() {
+    i=0
+    while [ $i -lt 100 ]; do
+        "$@" && return 0
+        sleep 0.1; i=$((i + 1))
+    done
+    return 1
+}
+
+push_file() {
+    _work_serial=$((_work_serial + 1))
+    W="$TMPDIR_BASE/_work${_work_serial}"
+    git clone "$1" "$W" >/dev/null 2>&1
+    printf 'x\n' > "$W/$2"
+    git -C "$W" add "$2" >/dev/null 2>&1
+    git -C "$W" -c user.email="t@t" -c user.name="t" commit -m "add $2" >/dev/null 2>&1
+    git -C "$W" push origin HEAD:main >/dev/null 2>&1
+    rm -rf "$W"
+}
+
+# run_bg <plugin> <cache> [env...] — default mode; sets OUT_BG, RC_BG, MS_BG.
+run_bg() {
+    plugin="$1"; cache="$2"; shift 2
+    T0=$(now_ms); RC_BG=0
+    OUT_BG=$(env -u HANDBOOK_SYNC_FOREGROUND "$@" CLAUDE_PLUGIN_ROOT="$plugin" \
+        HANDBOOK_CACHE_DIR="$cache" sh "$SCRIPT" 2>/dev/null) || RC_BG=$?
+    MS_BG=$(( $(now_ms) - T0 ))
+}
+
+BARE_R="$TMPDIR_BASE/bare_r.git"; make_bare_repo "$BARE_R"
+PLUGIN_R="$TMPDIR_BASE/plugin_r"; mkdir -p "$PLUGIN_R"
+write_handbooks_json "$PLUGIN_R" dev "$BARE_R" "Engineering handbook"
+CACHE_R="$TMPDIR_BASE/cache_r"
+
+# ── Case (r): a missing checkout still clones in the foreground ──────────────
+run_bg "$PLUGIN_R" "$CACHE_R" A=1
+if [ $RC_BG -eq 0 ] && [ -f "$CACHE_R/dev/README.md" ] \
+   && [ -f "$CACHE_R/dev/.git/handbook-synced" ] \
+   && printf '%s' "$OUT_BG" | grep -q '"hookEventName":"SessionStart"'; then
+    pass "case r: missing checkout clones before the hook returns (${MS_BG} ms)"
+else
+    fail "case r: rc=$RC_BG out='$OUT_BG'"
+fi
+
+# ── Case (s): a fresh checkout makes no network call ─────────────────────────
+# The remote now points at a path that does not exist, so any fetch would fail
+# and warn; a fresh checkout must not even try.
+PLUGIN_S="$TMPDIR_BASE/plugin_s"; mkdir -p "$PLUGIN_S"
+write_handbooks_json "$PLUGIN_S" dev "/nonexistent/fresh.git" "Engineering handbook"
+git -C "$CACHE_R/dev" remote set-url origin "/nonexistent/fresh.git"
+touch -d '1 minute ago' "$CACHE_R/dev/.git/handbook-synced"
+ERR_S="$TMPDIR_BASE/err_s"
+T0=$(now_ms)
+OUT_S=$(env -u HANDBOOK_SYNC_FOREGROUND CLAUDE_PLUGIN_ROOT="$PLUGIN_S" HANDBOOK_CACHE_DIR="$CACHE_R" \
+    sh "$SCRIPT" 2>"$ERR_S"); RC_S=$?
+MS_S=$(( $(now_ms) - T0 ))
+sleep 1
+if [ $RC_S -eq 0 ] && [ ! -s "$ERR_S" ] && [ "$MS_S" -lt 1500 ] \
+   && printf '%s' "$OUT_S" | grep -q 'Engineering handbook (dev)' \
+   && [ "$(date -r "$CACHE_R/dev/.git/handbook-synced" +%s)" -lt $(( $(date +%s) - 30 )) ]; then
+    pass "case s: checkout fetched 1 minute ago is served with no network call (${MS_S} ms)"
+else
+    fail "case s: rc=$RC_S ms=$MS_S err='$(cat "$ERR_S")' out='$OUT_S'"
+fi
+
+# ── Case (t): a stale checkout returns at once; the pull lands afterwards ────
+# A git shim sleeps 3 s inside pull, so a foreground pull could not return fast.
+SHIM_T="$TMPDIR_BASE/shim_t"; mkdir -p "$SHIM_T"
+cat > "$SHIM_T/git" <<SHIM
+#!/bin/sh
+case "\$*" in *" pull "*) sleep 3 ;; esac
+exec "$REAL_GIT" "\$@"
+SHIM
+chmod +x "$SHIM_T/git"
+git -C "$CACHE_R/dev" remote set-url origin "$BARE_R"
+push_file "$BARE_R" LATE.md
+touch -d '11 minutes ago' "$CACHE_R/dev/.git/handbook-synced"
+run_bg "$PLUGIN_R" "$CACHE_R" "PATH=$SHIM_T:$PATH"
+LATE_IMMEDIATE=no; [ -f "$CACHE_R/dev/LATE.md" ] && LATE_IMMEDIATE=yes
+T1=$(now_ms)
+if wait_for test -f "$CACHE_R/dev/LATE.md"; then LANDED=yes; else LANDED=no; fi
+LAND_MS=$(( $(now_ms) - T1 ))
+if [ $RC_BG -eq 0 ] && [ "$MS_BG" -lt 1500 ] && [ "$LATE_IMMEDIATE" = no ] && [ "$LANDED" = yes ] \
+   && printf '%s' "$OUT_BG" | grep -q '"hookEventName":"SessionStart"'; then
+    pass "case t: stale checkout returned in ${MS_BG} ms, background pull landed ${LAND_MS} ms later"
+else
+    fail "case t: rc=$RC_BG ms=$MS_BG immediate=$LATE_IMMEDIATE landed=$LANDED"
+fi
+
+# ── Case (u): concurrent runs on a stale checkout leave it intact ────────────
+push_file "$BARE_R" LATER.md
+wait_for test -f "$CACHE_R/dev/.git/handbook-synced" # settle case t's job
+sleep 3.5
+touch -d '11 minutes ago' "$CACHE_R/dev/.git/handbook-synced"
+PIDS=""
+T0=$(now_ms)
+for _ in 1 2 3 4; do
+    env -u HANDBOOK_SYNC_FOREGROUND PATH="$SHIM_T:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_R" \
+        HANDBOOK_CACHE_DIR="$CACHE_R" sh "$SCRIPT" >/dev/null 2>&1 &
+    PIDS="$PIDS $!"
+done
+# shellcheck disable=SC2086
+wait $PIDS
+MS_U=$(( $(now_ms) - T0 ))
+wait_for test -f "$CACHE_R/dev/LATER.md"
+sleep 3.5
+FSCK_U=ok; git -C "$CACHE_R/dev" fsck --no-progress >/dev/null 2>&1 || FSCK_U=bad
+STATUS_U=$(git -C "$CACHE_R/dev" status --porcelain)
+LOCKS_U=$(find "$CACHE_R/dev/.git" -name '*.lock' -size +0 2>/dev/null | wc -l)
+if [ "$FSCK_U" = ok ] && [ -z "$STATUS_U" ] && [ -f "$CACHE_R/dev/LATER.md" ] && [ "$MS_U" -lt 2500 ] \
+   && [ "$(git -C "$CACHE_R/dev" rev-parse HEAD)" = "$(git -C "$BARE_R" rev-parse main)" ]; then
+    pass "case u: 4 concurrent runs returned in ${MS_U} ms, checkout intact and up to date"
+else
+    fail "case u: fsck=$FSCK_U status='$STATUS_U' locks=$LOCKS_U ms=$MS_U"
+fi
+
+# ── Case (v): a stale mkdir lock is broken when flock is absent ──────────────
+# A PATH without flock forces the mkdir lock; a lock dir 5 minutes old must not
+# block the pull forever.
+NOFLOCK_V="$TMPDIR_BASE/noflock_v"; mkdir -p "$NOFLOCK_V"
+for tool in sh git jq find touch date sleep mktemp rm mv mkdir rmdir cat tr sed grep dirname basename timeout printf env; do
+    src=$(command -v "$tool" 2>/dev/null) && [ -x "$src" ] && ln -sf "$src" "$NOFLOCK_V/$tool"
+done
+push_file "$BARE_R" NOFLOCK.md
+mkdir "$CACHE_R/dev/.git/handbook-sync.lock.d"
+touch -d '5 minutes ago' "$CACHE_R/dev/.git/handbook-sync.lock.d"
+touch -d '11 minutes ago' "$CACHE_R/dev/.git/handbook-synced"
+env -u HANDBOOK_SYNC_FOREGROUND PATH="$NOFLOCK_V" CLAUDE_PLUGIN_ROOT="$PLUGIN_R" \
+    HANDBOOK_CACHE_DIR="$CACHE_R" "$NOFLOCK_V/sh" "$SCRIPT" >/dev/null 2>&1
+if wait_for test -f "$CACHE_R/dev/NOFLOCK.md" && wait_for test ! -d "$CACHE_R/dev/.git/handbook-sync.lock.d"; then
+    pass "case v: stale mkdir lock broken, pull landed, lock released"
+else
+    fail "case v: file=$(ls "$CACHE_R/dev/NOFLOCK.md" 2>&1) lock=$(ls -d "$CACHE_R/dev/.git/handbook-sync.lock.d" 2>&1)"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
