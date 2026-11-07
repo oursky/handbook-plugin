@@ -3,10 +3,18 @@
 # Reads handbooks.json from ${CLAUDE_PLUGIN_ROOT}; adding a new entry there
 # requires no edit to this script (AC-1).
 # Never exits non-zero — a sync failure must not break sessions.
+#
+# A session never waits on the network for a checkout it already has. A checkout
+# synced within HANDBOOK_REFRESH_MINUTES (default 10) is served as is. An older
+# one is served as is too, and pulled in a detached background job under a lock,
+# so the next session sees the update. Only a missing checkout clones in the
+# foreground. HANDBOOK_SYNC_FOREGROUND=1 pulls every checkout and waits.
 
 CACHE_ROOT="${HANDBOOK_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/oursky-handbook}"
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 HANDBOOKS_JSON="${PLUGIN_ROOT}/handbooks.json"
+REFRESH_MINUTES="${HANDBOOK_REFRESH_MINUTES:-10}"
+case "$REFRESH_MINUTES" in ''|*[!0-9]*) REFRESH_MINUTES=10 ;; esac
 
 # Wrap git in a timeout if the command exists.
 if command -v timeout >/dev/null 2>&1; then
@@ -77,6 +85,42 @@ install_team_skills() {
     fi
 }
 
+# A checkout is fresh when its stamp, touched after each successful sync, is
+# younger than REFRESH_MINUTES. A missing stamp counts as stale.
+is_fresh() {
+    [ -n "$(find "$1/.git/handbook-synced" -mmin "-$REFRESH_MINUTES" 2>/dev/null)" ]
+}
+
+# Take the per-checkout lock; the lock is released when the job ends. With flock
+# the kernel drops it on any exit, so it can never go stale. Without flock a
+# mkdir lock older than two minutes (hook timeout is 20 s) is broken.
+take_lock() {
+    if command -v flock >/dev/null 2>&1; then
+        exec 9>"$1/.git/handbook-sync.lock" && flock -n 9
+        return
+    fi
+    lock="$1/.git/handbook-sync.lock.d"
+    if [ -n "$(find "$lock" -maxdepth 0 -mmin +2 2>/dev/null)" ]; then
+        rmdir "$lock" 2>/dev/null
+    fi
+    mkdir "$lock" 2>/dev/null && trap 'rmdir "$lock" 2>/dev/null' EXIT
+}
+
+# pull_checkout <target> <team_skills> <relink>
+# Fast-forward one checkout under its lock. Returns 0 on success, 1 on a failed
+# pull, 2 when another job holds the lock. With relink=1 a moved HEAD relinks
+# the team skills, for the detached job that nobody is waiting on.
+pull_checkout() {
+    take_lock "$1" || return 2
+    before=$(git -C "$1" rev-parse HEAD 2>/dev/null)
+    run git -C "$1" pull --ff-only --quiet 2>/dev/null || return 1
+    touch "$1/.git/handbook-synced" 2>/dev/null
+    if [ "$3" = 1 ] && [ "$2" != "-" ] && [ "$before" != "$(git -C "$1" rev-parse HEAD 2>/dev/null)" ]; then
+        RELOAD_FILE=/dev/null install_team_skills "$1" "$2" >/dev/null
+    fi
+    return 0
+}
+
 # jq is required to parse handbooks.json.
 if ! command -v jq >/dev/null 2>&1; then
     printf 'handbook: jq is required but not installed; sync skipped\n' >&2
@@ -97,8 +141,8 @@ if [ -d "${CACHE_ROOT}/.git" ]; then
         "$CACHE_ROOT" >&2
 fi
 
-# Each handbook syncs in its own background subshell and writes to its own
-# fragment file, so the hook waits for the slowest repo, not the sum.
+# Each handbook is handled in its own background subshell and writes to its own
+# fragment file, so a first-run clone of all repos takes as long as the largest.
 STATUS_FILE="$(mktemp)"
 RELOAD_FILE="$(mktemp)"
 LIST_FILE="$(mktemp)"
@@ -122,6 +166,7 @@ sync_one() {
             TMPCLONE="${TARGET}.tmp.$$"
             if clone_handbook "$url" "$TMPCLONE" "$team_skills"; then
                 if mv "$TMPCLONE" "$TARGET" 2>/dev/null; then
+                    touch "$TARGET/.git/handbook-synced" 2>/dev/null
                     sha=$(git -C "$TARGET" rev-parse --short HEAD 2>/dev/null || printf 'unknown')
                 else
                     rm -rf "$TMPCLONE"
@@ -139,12 +184,17 @@ sync_one() {
         have_url=$(git -C "$TARGET" remote get-url origin 2>/dev/null)
         [ "$(repo_path "$have_url")" = "$(repo_path "$url")" ] \
             || git -C "$TARGET" remote set-url origin "$url" 2>/dev/null
-        if run git -C "$TARGET" pull --ff-only --quiet 2>/dev/null; then
-            sha=$(git -C "$TARGET" rev-parse --short HEAD 2>/dev/null || printf 'unknown')
-        else
-            printf 'handbook[%s]: pull failed; using stale cache\n' "$id" >&2
-            sha=$(git -C "$TARGET" rev-parse --short HEAD 2>/dev/null || printf 'stale')
+        if [ "${HANDBOOK_SYNC_FOREGROUND:-0}" = 1 ]; then
+            pull_checkout "$TARGET" "$team_skills" 0
+            case $? in
+                1) printf 'handbook[%s]: pull failed; using stale cache\n' "$id" >&2 ;;
+            esac
+        elif ! is_fresh "$TARGET"; then
+            # Detached: closed fds so the hook's pipe closes, HUP ignored so the
+            # job outlives the session that started it.
+            ( trap '' HUP; pull_checkout "$TARGET" "$team_skills" 1 ) </dev/null >/dev/null 2>&1 &
         fi
+        sha=$(git -C "$TARGET" rev-parse --short HEAD 2>/dev/null || printf 'unknown')
     fi
 
     printf '%s (%s) at %s [%s]\n' "$label" "$id" "$TARGET" "$sha" >> "$out"

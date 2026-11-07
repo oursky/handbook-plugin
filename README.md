@@ -27,8 +27,15 @@ skills into `~/.claude/skills`, `~/.codex/skills` and `~/.config/opencode/skills
 `OURSKY_TEAMS="engineering sales"` to pick other teams, and `OURSKY_SKILL_TARGETS` to a
 space-separated list of directories to change where the links go. Each session start
 re-syncs the links, so new skills arrive with the next pull. The hook also asks Claude Code to
-reload skills, so a first session sees the new links. The three repos sync at the same time,
-so a first session waits only for the largest clone and later sessions a few seconds.
+reload skills, so a first session sees the new links. The three repos clone at the same time,
+so a first session waits only for the largest clone.
+
+Later sessions never wait on the network. The hook serves the cached handbooks at once. A
+checkout synced in the last 10 minutes is left alone. An older one is pulled by a detached
+background job, so the update shows in the next session. A lock keeps two sessions from
+pulling the same checkout together. Set `HANDBOOK_REFRESH_MINUTES` to change the 10 minutes
+(`0` pulls in the background on every session). `HANDBOOK_SYNC_FOREGROUND=1` pulls and waits,
+which is what `/handbook:sync` does.
 
 To update:
 
@@ -49,9 +56,10 @@ Both are type-only (`disable-model-invocation: true`).
 ## How it works
 
 1. **SessionStart hook** — `hooks/sync-handbook.sh` reads `handbooks.json` and
-   clones or fast-forward pulls each handbook into `$HANDBOOK_CACHE_DIR/<id>/`
-   (default `~/.cache/oursky-handbook`). Never exits non-zero; a failed handbook
-   keeps its stale cache while others sync.
+   clones a missing handbook into `$HANDBOOK_CACHE_DIR/<id>/`
+   (default `~/.cache/oursky-handbook`) and serves existing ones from the cache,
+   refreshing stale ones in the background (see above). Never exits non-zero; a
+   failed handbook keeps its stale cache while others sync.
 2. **Topic-scoped skills** — 11 skills, one per handbook section. The model picks
    one from the prompt, reads the relevant file **in full** from the cache, and
    shells out to `rg` for exact-string lookups.

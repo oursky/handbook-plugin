@@ -39,7 +39,7 @@ done
 
 # ── Run sync (reuse hook as-is; suppress its JSON output) ────────────────────
 printf 'Syncing handbooks...\n'
-CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" HANDBOOK_CACHE_DIR="$CACHE_ROOT" \
+HANDBOOK_SYNC_FOREGROUND=1 CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" HANDBOOK_CACHE_DIR="$CACHE_ROOT" \
     sh "${PLUGIN_ROOT}/hooks/sync-handbook.sh" >/dev/null
 
 # ── Print status table ────────────────────────────────────────────────────────
