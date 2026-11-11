@@ -1,0 +1,12 @@
+schema_version: "1.1"
+name: _negative-generic-explain-code
+description: "Generic coding prompt; no handbook skill should fire."
+tags: [negative]
+runs: 3
+execution:
+  model: sonnet
+  max_turns: 5
+  timeout_seconds: 180
+  allowed_tools: [Read, Glob, Grep, Skill]
+  prompt: >-
+    explain what a closure is in JavaScript with a short example

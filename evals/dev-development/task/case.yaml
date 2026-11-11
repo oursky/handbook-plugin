@@ -1,0 +1,12 @@
+schema_version: "1.1"
+name: dev-development-task
+description: "task phrasing; handbook:dev-development should fire."
+tags: [dev-development]
+runs: 3
+execution:
+  model: sonnet
+  max_turns: 5
+  timeout_seconds: 180
+  allowed_tools: [Read, Glob, Grep, Skill]
+  prompt: >-
+    add a server-side fetch of a user-supplied webhook URL in our Go service, make sure it can't be pointed at internal addresses

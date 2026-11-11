@@ -1,0 +1,12 @@
+schema_version: "1.1"
+name: dev-deployment-infra-keyword
+description: "keyword phrasing; handbook:dev-deployment-infra should fire."
+tags: [dev-deployment-infra]
+runs: 3
+execution:
+  model: sonnet
+  max_turns: 5
+  timeout_seconds: 180
+  allowed_tools: [Read, Glob, Grep, Skill]
+  prompt: >-
+    how do we host a static site on pageship? need the config for a small marketing page
