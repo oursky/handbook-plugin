@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: dev-security-context-sops
+description: "Mid-task instruction in a small Express repo; handbook:dev-security should fire or the handbook cache should be read."
+tags: [dev-security, context]
+runs: 3
+execution:
+  model: sonnet
+  max_turns: 8
+  timeout_seconds: 240
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Edit, Write]
+  prompt: >-
+    set up SOPS for the .env.production secrets so we can commit them safely
+context:
+  scaffold_script: scaffold.sh

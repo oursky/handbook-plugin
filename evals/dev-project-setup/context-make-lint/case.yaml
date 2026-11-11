@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: dev-project-setup-context-make-lint
+description: "Mid-task instruction in a small Express repo; handbook:dev-project-setup should fire or the handbook cache should be read."
+tags: [dev-project-setup, context]
+runs: 3
+execution:
+  model: sonnet
+  max_turns: 8
+  timeout_seconds: 240
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Edit, Write]
+  prompt: >-
+    add a make target for lint and wire it into the CI workflow
+context:
+  scaffold_script: scaffold.sh
