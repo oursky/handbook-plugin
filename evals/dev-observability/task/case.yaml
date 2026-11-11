@@ -1,0 +1,12 @@
+schema_version: "1.1"
+name: dev-observability-task
+description: "task phrasing; handbook:dev-observability should fire."
+tags: [dev-observability]
+runs: 3
+execution:
+  model: sonnet
+  max_turns: 5
+  timeout_seconds: 180
+  allowed_tools: [Read, Glob, Grep, Skill]
+  prompt: >-
+    add OpenTelemetry metrics to this backend and export to our collector

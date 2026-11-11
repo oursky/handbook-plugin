@@ -4,8 +4,8 @@ node_modules/
 # Groundwork working state (keep motives and journal)
 .groundwork/
 
-# Eval suite and results
-evals/
+# Eval run output
+evals/**/results/
 
 # Internal documentation (not shipped)
 doc/OPEN-QUESTIONS.md

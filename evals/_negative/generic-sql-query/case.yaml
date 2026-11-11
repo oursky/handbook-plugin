@@ -1,0 +1,12 @@
+schema_version: "1.1"
+name: _negative-generic-sql-query
+description: "Generic coding prompt; no handbook skill should fire."
+tags: [negative]
+runs: 3
+execution:
+  model: sonnet
+  max_turns: 5
+  timeout_seconds: 180
+  allowed_tools: [Read, Glob, Grep, Skill]
+  prompt: >-
+    write a SQL query for the top 5 customers by total order value in the last 30 days

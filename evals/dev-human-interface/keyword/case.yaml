@@ -1,0 +1,12 @@
+schema_version: "1.1"
+name: dev-human-interface-keyword
+description: "keyword phrasing; handbook:dev-human-interface should fire."
+tags: [dev-human-interface]
+runs: 3
+execution:
+  model: sonnet
+  max_turns: 5
+  timeout_seconds: 180
+  allowed_tools: [Read, Glob, Grep, Skill]
+  prompt: >-
+    what padding should buttons have, and what's our type scale?

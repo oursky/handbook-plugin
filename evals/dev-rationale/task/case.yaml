@@ -1,0 +1,12 @@
+schema_version: "1.1"
+name: dev-rationale-task
+description: "task phrasing; handbook:dev-rationale should fire."
+tags: [dev-rationale]
+runs: 3
+execution:
+  model: sonnet
+  max_turns: 5
+  timeout_seconds: 180
+  allowed_tools: [Read, Glob, Grep, Skill]
+  prompt: >-
+    clean up the comments and TODOs in this module before I hand it off, it'll be maintained for years
