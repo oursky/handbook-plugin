@@ -4,7 +4,7 @@ description: "Security guidance from Oursky's engineering handbook. Use when ask
 user-invocable: false
 ---
 
-<!-- handbook-reviewed: 2b4ec2b12888e9476357b2dbfccfab00d46ad1da -->
+<!-- handbook-reviewed: 1c3dd2357955afc271439d6956871fd1deab984e -->
 
 ## Cache root
 
@@ -13,7 +13,7 @@ CACHE="${HANDBOOK_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/oursky-handbook}"
 ## Files in this topic
 
 - security/gpg-sops-secrets.md — how to encrypt repo secrets with GPG + SOPS; file naming convention, .sops.yaml setup, key rotation, and remote key custody via keyservice
-- security/package-audit-scanning.md — dependency vulnerability auditing (`make audit` / `make security`) with language-specific tooling for Python, Go, JS/TS, .NET, Ruby, Android, iOS
+- security/package-audit-scanning.md — dependency vulnerability auditing (`make audit` / `make security`): CI fails on High/Critical, production suppression rules, and tooling for Python, Go, JS/TS, Ruby, Android, iOS
 - security/secure-project-setup.md — foundational security controls for new projects: .gitignore, .dockerignore, CI validation, TLS minimums, mobile secure storage and cert pinning
 - security/index.md — topic overview table (consult to orient, then read the relevant file above)
 - security/maintenance-project.md — maintenance checklist for projects not under active development: runtime/dependency/k8s updates, OWASP Top 10 report, version selection vs EOL
@@ -22,8 +22,7 @@ CACHE="${HANDBOOK_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/oursky-handbook}"
 ## How to answer
 
 1. Identify which file(s) cover the question.
-2. Read the relevant file(s) in **full** from `$CACHE/dev/guides/security/`.
+2. Read the relevant file(s) in **full** from `$CACHE/dev/security/`.
    Do not paraphrase rules from memory — quote the file.
 3. For an exact-string lookup (e.g. a config value, command, or rule):
-   `rg -l "search term" "$CACHE/dev/guides/security/"`
-4. `historical-archive/` is deprecated; do not cite files from it.
+   `rg -l "search term" "$CACHE/dev/security/"`

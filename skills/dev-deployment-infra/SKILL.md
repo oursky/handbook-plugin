@@ -4,7 +4,7 @@ description: "Deployment & infra guidance from Oursky's engineering handbook. Us
 user-invocable: false
 ---
 
-<!-- handbook-reviewed: 2b4ec2b12888e9476357b2dbfccfab00d46ad1da -->
+<!-- handbook-reviewed: 1c3dd2357955afc271439d6956871fd1deab984e -->
 
 ## Cache root
 
@@ -27,8 +27,7 @@ CACHE="${HANDBOOK_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/oursky-handbook}"
 ## How to answer
 
 1. Identify which file(s) cover the question.
-2. Read the relevant file(s) in **full** from `$CACHE/dev/guides/deployment-infra/`.
+2. Read the relevant file(s) in **full** from `$CACHE/dev/deployment-infra/`.
    Do not paraphrase rules from memory — quote the file.
 3. For an exact-string lookup (e.g. a config value, command, or rule):
-   `rg -l "search term" "$CACHE/dev/guides/deployment-infra/"`
-4. `historical-archive/` is deprecated; do not cite files from it.
+   `rg -l "search term" "$CACHE/dev/deployment-infra/"`
