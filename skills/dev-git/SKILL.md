@@ -1,6 +1,6 @@
 ---
 name: dev-git
-description: "Git guidance from Oursky's engineering handbook. Use when asking about rebase, branch naming, hotfix, PR merge strategy, remote naming, commit style, or fork workflow."
+description: "Git guidance from Oursky's engineering handbook. Use when writing, amending or rewording a commit message (subject or body), or asking about rebase, branch naming, hotfix, PR merge strategy, remote naming, commit style, or fork workflow."
 user-invocable: false
 ---
 
