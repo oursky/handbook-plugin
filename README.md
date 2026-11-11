@@ -45,9 +45,9 @@ Update with `claude plugin marketplace update oursky-handbook`, then `claude plu
 | Command | Purpose |
 |---|---|
 | `/handbook:sync` | Pull now. Prints each handbook's SHA and whether it moved. `--regen` regenerates skills. |
-| `/handbook:usage` | Fire counts per handbook skill, including never-fired ones. `--since 7d` windows it. |
+| `/handbook:usage` | Hits per handbook skill, split by Skill call and direct read, including never-hit ones. `--since 7d` windows it. |
 
-Usage logging writes one line per `handbook:` skill call to `~/.claude/plugins/data/handbook-*/skill-usage.jsonl`. Never logs prompts or paths. No network calls. It counts fires only, not missed fires. A skill at zero after real work has a description that misses how people ask.
+Usage logging writes one line per handbook skill to `~/.claude/plugins/data/handbook-*/skill-usage.jsonl`. A `Skill` call logs `via: "skill"`. A Read, Grep, Glob or Bash call that touches the handbook cache logs `via: "read"` against the matching skill, or `handbook:<id>` when no skill matches. The report splits the two. It never logs prompts, paths or commands, and makes no network calls. It counts hits only, not missed hits. A skill at zero after real work has a description that misses how people ask.
 
 ## Adding a handbook
 
