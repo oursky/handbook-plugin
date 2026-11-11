@@ -392,7 +392,7 @@ run_generate() {
 
         # Walk subdirectories of topic_root at hb_depth levels.
         # Fallback: if topic_root has no subdirectories, treat topic_root itself
-        # as the single topic (handles flat handbooks like pm/usage-guide/).
+        # as the single topic (handles flat handbooks with depth 0).
         # Hidden directories (.git, .agents, .claude) are never topics.
         local -a topic_dirs=()
         while IFS= read -r d; do

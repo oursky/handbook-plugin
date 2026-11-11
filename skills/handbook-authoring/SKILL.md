@@ -115,10 +115,7 @@ Reports two things — **does not gate or block generation**:
   handbook.
 - **Cross-handbook near-duplicates** (informational only): shared nouns across
   handbooks. This is expected and legitimate — the corpus name in each
-  description's first clause disambiguates. The shipped example: `pm` covers
-  `openapi_spec_generation.md` and `github_commit_summary.md` while
-  `dev-development` reserves *API* and `dev-git` reserves *commit style*. Both
-  sets are correct.
+  description's first clause disambiguates.
 
 Run check mode after generation to surface anything to review. It never fails
 the run.

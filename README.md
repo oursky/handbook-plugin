@@ -15,8 +15,8 @@ Restart Claude Code, then ask something like "what's our branch naming conventio
 to confirm it routes to the handbook.
 
 This repo is public, but the handbooks it syncs are not — you need `jq`
-(`brew install jq` / `apt install jq`) and read access to `oursky/handbook-dev`,
-`oursky/os-project-management` and `oursky/handbook`. They sync to
+(`brew install jq` / `apt install jq`) and read access to `oursky/handbook-dev`
+and `oursky/handbook`. They sync to
 `~/.cache/oursky-handbook/` at session start over https, so run `gh auth setup-git`
 first; on a dev machine with SSH keys, an `insteadOf` rule
 (`git config --global url."git@github.com:".insteadOf https://github.com/`) works too.
@@ -60,7 +60,7 @@ Both are type-only (`disable-model-invocation: true`).
    (default `~/.cache/oursky-handbook`) and serves existing ones from the cache,
    refreshing stale ones in the background (see above). Never exits non-zero; a
    failed handbook keeps its stale cache while others sync.
-2. **Topic-scoped skills** — 11 skills, one per handbook section. The model picks
+2. **Topic-scoped skills** — one skill per handbook section. The model picks
    one from the prompt, reads the relevant file **in full** from the cache, and
    shells out to `rg` for exact-string lookups.
 
@@ -68,9 +68,9 @@ No index, no embeddings, no chunking, no PreToolUse injection — the corpus is
 small enough that whole-file reads are cheaper than a retrieval pipeline
 (decisions D-2, D-6).
 
-Skills: `dev-agentic-engineering`, `dev-deployment-infra`, `dev-development`,
+Skills: `dev-deployment-infra`, `dev-development`, `dev-documentation`,
 `dev-git`, `dev-human-interface`, `dev-observability`, `dev-project-setup`,
-`dev-security`, `dev-web`, `pm-usage-guide`, `handbook-authoring`.
+`dev-rationale`, `dev-security`, `dev-web`, `handbook-authoring`.
 
 ## Adding a handbook
 
@@ -78,11 +78,11 @@ Add one entry to `handbooks.json` — no script edits needed:
 
 ```json
 {
-  "id": "pm",
-  "url": "https://github.com/oursky/os-project-management.git",
-  "topic_root": "usage-guide/",
-  "depth": 0,
-  "label": "Oursky PM workflow handbook"
+  "id": "dev",
+  "url": "https://github.com/oursky/handbook-dev.git",
+  "topic_root": "./",
+  "depth": 1,
+  "label": "Oursky engineering handbook"
 }
 ```
 

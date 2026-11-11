@@ -17,7 +17,6 @@ Examples:
 |-------------|---------------------|-------------------------------|
 | `dev`       | `git`               | `dev-git`                     |
 | `dev`       | `security`          | `dev-security`                |
-| `pm`        | `usage-guide`       | `pm-usage-guide`              |
 
 The exception is `handbook-authoring`, which is a hand-authored meta-skill
 (not tied to any handbook corpus) and follows no `<id>-<topic>` pattern.
@@ -28,7 +27,7 @@ The exception is `handbook-authoring`, which is a hand-authored meta-skill
 
 ```yaml
 ---
-name: <handbook-id>-<topic>    # e.g. dev-git, dev-security, pm-usage-guide
+name: <handbook-id>-<topic>    # e.g. dev-git, dev-security
 description: "<clause1> <clause2>"
 user-invocable: false
 ---
@@ -41,7 +40,7 @@ user-invocable: false
 - **Total: ≤200 chars** (hard cap; run `echo -n "$desc" | wc -c` to verify).
 - **Clause 1 ≤65 chars:** `<Topic> guidance from <label>.`
   where `<label>` is the exact `label` value from `handbooks.json`
-  (e.g. `"Oursky engineering handbook"`, `"Oursky PM workflow handbook"`).
+  (e.g. `"Oursky engineering handbook"`).
   This corpus identifier is the primary disambiguator when two handbooks
   cover related topics.
 - **Clause 2:** `Use when <3–6 natural phrasings a teammate would actually type>,
@@ -58,18 +57,11 @@ Nouns are disjoint **within a handbook only — not across handbooks.**
 **Rationale:** Forcing global uniqueness would silence a handbook that
 genuinely owns a topic. Cross-handbook overlap is legitimate: when two
 handbooks cover related subject matter from different angles, the corpus
-identifier in clause 1 (e.g. "engineering handbook" vs "PM workflow handbook")
+identifier in clause 1 (e.g. "engineering handbook" vs "company handbook")
 is what routes the question correctly — not noun exclusivity.
 
-**Worked example:** The `pm` corpus documents `openapi-spec-generation` and
-`github-commit-summary`. Meanwhile `dev-development` reserves the noun *API*
-and `dev-git` reserves *commit style*. An OpenAPI or commit question can
-properly land in either corpus: a developer asking about the team API-design
-rule lands in `dev-development`; a PM asking which tool to use to generate
-an OpenAPI spec lands in `pm-usage-guide`. Both behaviours are correct.
-The disjointness rule keeps the *dev* skills from fighting each other, and
-the *pm* skills from fighting each other — it does not govern cross-handbook
-overlaps.
+The disjointness rule keeps the skills of one handbook from fighting each
+other — it does not govern cross-handbook overlaps.
 
 ### `dev` — Oursky engineering handbook
 
@@ -88,20 +80,11 @@ nouns in your description.
 | security            | secrets, GPG, SOPS, incident response, package audit                      |
 | web                 | SEO, URL design, localization, web performance, web navigation             |
 
-### `pm` — Oursky PM workflow handbook
-
-The `pm` handbook currently ships one skill (`pm-usage-guide`) covering its
-entire `usage-guide/` corpus. All nouns below belong to that single skill.
-
-| Topic dir   | Reserved trigger nouns / phrases                                                                      |
-|-------------|-------------------------------------------------------------------------------------------------------|
-| usage-guide | Basecamp work record, Linear bug report, sprint objective, sprint goal, user story, progress update, openapi spec generation, github commit summary, master requirement, video usage guide |
-
 ---
 
 ## Generated-vs-hand-authored ownership
 
-Most per-topic skills (`dev-*`, `pm-usage-guide`) are **generated** by the
+Most per-topic skills (`dev-*`) are **generated** by the
 `handbook-authoring` meta-skill. The `handbook-authoring` skill itself is
 **hand-authored** with `user-invocable: true`.
 
@@ -142,13 +125,12 @@ CACHE="${HANDBOOK_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/oursky-handbook}"
 ```
 
 Cache path structure: `<cache-root>/<id>/<topic_root>/<dir>/`
-— the `<id>/` segment (e.g. `dev/`, `pm/`) must appear in the **base path** used in the
+— the `<id>/` segment (e.g. `dev/`) must appear in the **base path** used in the
 "How to answer" section. File listing entries are relative to that base and correctly omit it.
 A base path that lacks `<id>/` is the old single-handbook layout and is **incorrect**.
 
 Concrete examples:
 - `dev-git` reads from `$CACHE/dev/guides/git/`
-- `pm-usage-guide` reads from `$CACHE/pm/usage-guide/`
 
 ---
 

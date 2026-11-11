@@ -8,13 +8,6 @@
       "label": "Oursky engineering handbook"
     },
     {
-      "id": "pm",
-      "url": "https://github.com/oursky/os-project-management.git",
-      "topic_root": "usage-guide/",
-      "depth": 0,
-      "label": "Oursky PM workflow handbook"
-    },
-    {
       "id": "handbook",
       "url": "https://github.com/oursky/handbook.git",
       "team_skills": "team-skills",

@@ -6,14 +6,14 @@
     "email": "newman.kcchow@gmail.com"
   },
   "metadata": {
-    "description": "Oursky's private engineering and PM workflow handbooks, exposed to Claude Code agents as read-only reference",
-    "version": "0.4.7"
+    "description": "Oursky's private engineering handbook, exposed to Claude Code agents as read-only reference",
+    "version": "0.4.8"
   },
   "plugins": [
     {
       "name": "handbook",
       "source": "./",
-      "description": "Oursky engineering and PM workflow handbooks as read-only reference for Claude Code agents. Syncs the handbooks into a local cache at session start and routes agents to whole files via topic-scoped skills.",
+      "description": "Oursky engineering handbook as read-only reference for Claude Code agents. Syncs the handbooks into a local cache at session start and routes agents to whole files via topic-scoped skills.",
       "category": "documentation",
       "tags": ["handbook", "reference", "documentation", "oursky", "knowledge-base"]
     }
