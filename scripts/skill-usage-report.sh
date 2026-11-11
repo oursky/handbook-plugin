@@ -149,17 +149,20 @@ total=$(wc -l < "$tmpfile" | tr -d ' ')
 if [ "$total" -eq 0 ]; then
     printf 'No invocations in window.\n'
 else
-    printf '%-45s  %6s  %s\n' "Skill" "Count" "Last used"
-    printf '%-45s  %6s  %s\n' "-----" "-----" "---------"
+    printf '%-45s  %9s  %8s  %6s  %s\n' "Skill" "Via skill" "Via read" "Total" "Last used"
+    printf '%-45s  %9s  %8s  %6s  %s\n' "-----" "---------" "--------" "-----" "---------"
 
-    jq -r '.skill' "$tmpfile" 2>/dev/null | sort -u > "$fired_file"
-
-    while IFS= read -r sk; do
-        count=$(grep -c "\"skill\":\"${sk}\"" "$tmpfile" 2>/dev/null || printf '0')
-        last=$(jq -r --arg sk "$sk" 'select(.skill==$sk) | .timestamp' "$tmpfile" 2>/dev/null | sort | tail -1)
-        last_date=$(printf '%s' "$last" | cut -c1-10)
-        printf '%-45s  %6s  %s\n' "$sk" "$count" "$last_date"
-    done < "$fired_file"
+    jq -rs '[.[] | {skill, via: (.via // "skill"), timestamp}]
+        | group_by(.skill)[]
+        | [.[0].skill,
+           (map(select(.via == "skill")) | length),
+           (map(select(.via == "read")) | length),
+           length,
+           (map(.timestamp) | max | .[0:10])]
+        | @tsv' "$tmpfile" 2>/dev/null |
+    while IFS="$(printf '\t')" read -r sk via_skill via_read n last_date; do
+        printf '%-45s  %9s  %8s  %6s  %s\n' "$sk" "$via_skill" "$via_read" "$n" "$last_date"
+    done
 fi
 
 printf '\n--- Never fired ---\n'
@@ -175,4 +178,4 @@ else
     done
 fi
 
-printf '\nTotal invocations in window: %s\n' "$total"
+printf '\nTotal hits in window: %s\n' "$total"
